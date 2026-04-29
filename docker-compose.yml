@@ -18,8 +18,12 @@ services:
       - traefik.http.routers.akashic-research-engine-web.middlewares=akashic-research-engine-https-redirect
       - traefik.http.routers.akashic-research-engine.rule=Host(`akashicresearch.info`) || Host(`www.akashicresearch.info`)
       - traefik.http.routers.akashic-research-engine.entrypoints=websecure
+      - traefik.http.routers.akashic-research-engine.middlewares=akashic-research-engine-security-headers
       - traefik.http.routers.akashic-research-engine.tls=true
       - traefik.http.routers.akashic-research-engine.tls.certresolver=letsencrypt
       - traefik.http.middlewares.akashic-research-engine-https-redirect.redirectscheme.scheme=https
       - traefik.http.middlewares.akashic-research-engine-https-redirect.redirectscheme.permanent=true
+      - traefik.http.middlewares.akashic-research-engine-security-headers.headers.stsseconds=31536000
+      - traefik.http.middlewares.akashic-research-engine-security-headers.headers.stsincludesubdomains=true
+      - traefik.http.middlewares.akashic-research-engine-security-headers.headers.forcestsheader=true
       - traefik.http.services.akashic-research-engine.loadbalancer.server.port=3500
