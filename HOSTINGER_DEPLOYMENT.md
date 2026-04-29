@@ -1,0 +1,87 @@
+# Hostinger VPS Production Deployment
+
+This app follows the same management rules as the other current online applications:
+
+- GitHub is the source of truth.
+- Hostinger runs a Docker service from a checked-out GitHub commit.
+- Traefik routes the production domain to the app container.
+- Rollbacks deploy a known GitHub commit SHA.
+
+## Production Service
+
+Domain:
+
+```text
+https://akashicresearch.info
+https://www.akashicresearch.info
+```
+
+Service:
+
+```text
+container: akashic-research-engine
+port: 3500
+repo path on VPS: /opt/akashic-research-engine/app
+```
+
+## One-Time VPS Setup
+
+On the Hostinger VPS:
+
+```bash
+sudo mkdir -p /opt/akashic-research-engine
+sudo chown -R "$USER":"$USER" /opt/akashic-research-engine
+cd /opt/akashic-research-engine
+git clone https://github.com/dpwebb/Akashic-Research-Engine.git app
+cd app
+npm ci
+npm run typecheck
+npm run build
+npm run build:site
+docker compose up -d --build akashic-research-engine
+```
+
+The VPS must already have Docker and the Hostinger Traefik stack available, matching the other apps.
+
+## GitHub Environment Secrets
+
+Create or reuse the `production` environment in GitHub Actions with:
+
+- `PRODUCTION_HOST`
+- `PRODUCTION_USER`
+- `PRODUCTION_SSH_PRIVATE_KEY`
+- `PRODUCTION_SSH_PORT` optional, defaults to `22`
+
+## Production Checks
+
+Before manual deployments from this PC:
+
+```bash
+npm run check:source-of-truth
+```
+
+On the VPS, basic service checks:
+
+```bash
+docker ps -a | grep akashic-research-engine
+curl -k -I https://akashicresearch.info
+curl http://127.0.0.1:3500/health
+```
+
+## Updating Production
+
+Normal updates happen through GitHub Actions after pushing to `main`.
+
+Manual equivalent on the VPS:
+
+```bash
+cd /opt/akashic-research-engine/app
+git fetch --prune origin
+git checkout <known-github-commit-sha>
+npm ci
+npm run typecheck
+npm run build
+npm run build:site
+docker rm -f akashic-research-engine 2>/dev/null || true
+docker compose up -d --build akashic-research-engine
+```

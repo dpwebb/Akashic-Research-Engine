@@ -2,9 +2,13 @@
   "name": "akashic-research-engine",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "build:site": "node scripts/build-site.mjs",
+    "check:production-services": "bash scripts/check-production-services.sh",
+    "check:source-of-truth": "node scripts/check-github-source-of-truth.mjs",
+    "start": "node server/productionServer.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
