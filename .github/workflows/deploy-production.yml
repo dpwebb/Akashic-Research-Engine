@@ -66,13 +66,35 @@ jobs:
           chmod 700 ~/.ssh
           printf '%s\n' "$PRODUCTION_SSH_PRIVATE_KEY" > ~/.ssh/production_deploy_key.raw
           python3 - <<'PY'
+          import base64
+          import binascii
           from pathlib import Path
 
           raw_path = Path.home() / ".ssh" / "production_deploy_key.raw"
           key_path = Path.home() / ".ssh" / "production_deploy_key"
-          key = raw_path.read_text()
+          key = raw_path.read_text().strip()
+
+          if (key.startswith('"') and key.endswith('"')) or (key.startswith("'") and key.endswith("'")):
+              key = key[1:-1].strip()
+
           key = key.replace("\\n", "\n")
-          key = key.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
+          key = key.replace("\r\n", "\n").replace("\r", "\n").strip()
+
+          if "-----BEGIN " not in key:
+              try:
+                  decoded = base64.b64decode(key, validate=True).decode("utf-8").strip()
+                  if "-----BEGIN " in decoded:
+                      key = decoded
+              except (binascii.Error, UnicodeDecodeError):
+                  pass
+
+          if "-----BEGIN " not in key or "PRIVATE KEY-----" not in key:
+              raise SystemExit(
+                  "PRODUCTION_SSH_PRIVATE_KEY must be a private SSH key, not a public key, "
+                  "PuTTY .ppk file, or fingerprint. Use an OpenSSH private key or base64-encoded OpenSSH private key."
+              )
+
+          key = key + "\n"
           key_path.write_text(key)
           raw_path.unlink()
           PY

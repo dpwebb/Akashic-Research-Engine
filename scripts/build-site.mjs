@@ -9,6 +9,5 @@ await mkdir(siteDistDir, { recursive: true });
 
 await Promise.all([
   cp(new URL('../index.html', import.meta.url), new URL('../site/index.html', import.meta.url)),
-  cp(new URL('../CNAME', import.meta.url), new URL('../site/CNAME', import.meta.url)),
   cp(distDir, siteDistDir, { recursive: true }),
 ]);

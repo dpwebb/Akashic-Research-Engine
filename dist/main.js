@@ -9,6 +9,6 @@ const message = document.createElement('p');
 const domain = document.createElement('strong');
 heading.textContent = 'Akashic Research Engine';
 domain.textContent = 'akashicresearch.info';
-message.append('GitHub Pages is configured for ', domain, '.');
+message.append('Hostinger VPS deployment is configured for ', domain, '.');
 main.append(heading, message);
 app.append(main);

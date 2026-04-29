@@ -24,6 +24,23 @@ port: 3500
 repo path on VPS: /opt/akashic-research-engine/app
 ```
 
+## DNS
+
+Point the domain to the Hostinger VPS:
+
+```text
+A record: @   -> <Hostinger VPS IPv4>
+A record: www -> <Hostinger VPS IPv4>
+```
+
+Alternatively, `www` can point at the root domain:
+
+```text
+CNAME record: www -> akashicresearch.info
+```
+
+Do not point `www` to any non-Hostinger deployment host; this application is served by Hostinger VPS.
+
 ## One-Time VPS Setup
 
 On the Hostinger VPS:
@@ -51,6 +68,26 @@ Create or reuse the `production` environment in GitHub Actions with:
 - `PRODUCTION_USER`
 - `PRODUCTION_SSH_PRIVATE_KEY`
 - `PRODUCTION_SSH_PORT` optional, defaults to `22`
+
+`PRODUCTION_SSH_PRIVATE_KEY` must be an OpenSSH private key for the VPS deploy user. It must not be the `.pub` public key, a key fingerprint, or a PuTTY `.ppk` file.
+
+Accepted formats:
+
+```text
+-----BEGIN OPENSSH PRIVATE KEY-----
+...
+-----END OPENSSH PRIVATE KEY-----
+```
+
+or a base64-encoded OpenSSH private key.
+
+To create a deploy key on this PC or another trusted machine:
+
+```bash
+ssh-keygen -t ed25519 -C "akashic-research-engine-deploy" -f ./akashic_research_engine_deploy
+```
+
+Add the public key to the VPS deploy user's `~/.ssh/authorized_keys`, then store the private key content from `akashic_research_engine_deploy` in the GitHub secret.
 
 ## Production Checks
 
