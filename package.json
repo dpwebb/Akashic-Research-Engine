@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "tsc",
+    "build:site": "node scripts/build-site.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -8,9 +8,10 @@ This repository is configured for deployment on **GitHub Pages** with the custom
 ## Included Configuration
 
 - `CNAME` at repository root with `akashicresearch.info`.
-- GitHub Actions workflow at `.github/workflows/pages.yml` to deploy Pages on push.
-- TypeScript app entry at `src/main.ts` that compiles to `dist/main.js`.
-- `index.html` shell that loads the compiled TypeScript output.
+- GitHub Actions workflow at `.github/workflows/pages.yml` builds and deploys Pages on push.
+- TypeScript app entry at `src/main.ts` compiles to `dist/main.js`.
+- `index.html` shell loads the compiled TypeScript output.
+- `scripts/build-site.mjs` creates the deployable `site/` artifact.
 
 ## Local Development
 
@@ -26,10 +27,14 @@ This repository is configured for deployment on **GitHub Pages** with the custom
    ```bash
    npm run build
    ```
+4. Build the GitHub Pages artifact:
+   ```bash
+   npm run build:site
+   ```
 
 ## GitHub Pages Setup Steps
 
-1. In GitHub, go to **Settings → Pages**.
+1. In GitHub, go to **Settings -> Pages**.
 2. Ensure **Build and deployment** uses **GitHub Actions**.
 3. In **Custom domain**, set `akashicresearch.info`.
 4. After DNS propagation, enable **Enforce HTTPS**.
@@ -38,8 +43,8 @@ This repository is configured for deployment on **GitHub Pages** with the custom
 
 At your DNS provider for `akashicresearch.info`, add:
 
-- `A` record: `@` → `185.199.108.153`
-- `A` record: `@` → `185.199.109.153`
-- `A` record: `@` → `185.199.110.153`
-- `A` record: `@` → `185.199.111.153`
-- `CNAME` record: `www` → `dpwebb.github.io`
+- `A` record: `@` -> `185.199.108.153`
+- `A` record: `@` -> `185.199.109.153`
+- `A` record: `@` -> `185.199.110.153`
+- `A` record: `@` -> `185.199.111.153`
+- `CNAME` record: `www` -> `dpwebb.github.io`
