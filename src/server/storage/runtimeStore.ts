@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { IngestionJob, ReviewQueueItem } from '../../shared/types.js';
 import { seedReviewQueue } from '../../shared/seedData.js';
@@ -22,6 +22,13 @@ let writeChain = Promise.resolve();
 let backupChain = Promise.resolve();
 let backupDirty = false;
 let backupTimer: NodeJS.Timeout | null = null;
+
+export type RuntimeBackupStatus = {
+  backupDirectory: string;
+  intervalMs: number;
+  pendingChanges: boolean;
+  latestBackupAt?: string;
+};
 
 export async function loadRuntimeState(): Promise<RuntimeState> {
   if (state) {
@@ -102,6 +109,15 @@ export async function backupRuntimeStateIfChanged(): Promise<void> {
   await backupChain;
 }
 
+export async function getRuntimeBackupStatus(): Promise<RuntimeBackupStatus> {
+  return {
+    backupDirectory: runtimeBackupDirectory,
+    intervalMs: runtimeBackupIntervalMs,
+    pendingChanges: backupDirty,
+    latestBackupAt: await getLatestBackupTimestamp(),
+  };
+}
+
 function normalizeReviewQueueItems(items: ReviewQueueItem[]): ReviewQueueItem[] {
   return items.map((item) => {
     try {
@@ -148,4 +164,13 @@ async function writeAtomically(path: string, content: string): Promise<void> {
   const temporaryPath = `${path}.tmp`;
   await writeFile(temporaryPath, content, 'utf8');
   await rename(temporaryPath, path);
+}
+
+async function getLatestBackupTimestamp(): Promise<string | undefined> {
+  try {
+    const latestBackup = await stat(join(runtimeBackupDirectory, 'latest.json'));
+    return latestBackup.mtime.toISOString();
+  } catch {
+    return undefined;
+  }
 }

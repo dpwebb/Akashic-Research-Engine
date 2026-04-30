@@ -20,6 +20,12 @@ type RuntimeSummary = {
     completed: number;
     failed: number;
   };
+  backups: {
+    backupDirectory: string;
+    intervalMs: number;
+    pendingChanges: boolean;
+    latestBackupAt?: string;
+  };
 };
 
 const emptyRuntimeSummary: RuntimeSummary = {
@@ -38,6 +44,11 @@ const emptyRuntimeSummary: RuntimeSummary = {
     running: 0,
     completed: 0,
     failed: 0,
+  },
+  backups: {
+    backupDirectory: '',
+    intervalMs: 3_600_000,
+    pendingChanges: false,
   },
 };
 
@@ -124,6 +135,28 @@ export function Dashboard() {
       </section>
 
       <section className="panel">
+        <h2>Backup Operations</h2>
+        <div className="backup-status-grid">
+          <article>
+            <span>Interval</span>
+            <strong>{formatDuration(runtimeSummary.backups.intervalMs)}</strong>
+          </article>
+          <article>
+            <span>Pending changes</span>
+            <strong>{runtimeSummary.backups.pendingChanges ? 'Yes' : 'No'}</strong>
+          </article>
+          <article>
+            <span>Latest backup</span>
+            <strong>{formatOptionalDate(runtimeSummary.backups.latestBackupAt)}</strong>
+          </article>
+          <article>
+            <span>Backup path</span>
+            <strong>{runtimeSummary.backups.backupDirectory || 'runtime-data/backups'}</strong>
+          </article>
+        </div>
+      </section>
+
+      <section className="panel">
         <h2>Source Classes</h2>
         <div className="distribution-grid">
           {sourceClassifications.map((classification) => {
@@ -202,6 +235,19 @@ function DistributionBar({ label, value, total }: { label: string; value: number
       <strong>{value}</strong>
     </article>
   );
+}
+
+function formatDuration(milliseconds: number): string {
+  const minutes = Math.round(milliseconds / 60_000);
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return `${minutes / 60}h`;
+  }
+
+  return `${minutes}m`;
+}
+
+function formatOptionalDate(value?: string): string {
+  return value ? new Date(value).toLocaleString() : 'none yet';
 }
 
 function getIndexRecordCount() {

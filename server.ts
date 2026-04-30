@@ -15,7 +15,12 @@ import {
   normalizeSourceUrl,
 } from './src/server/deduplication/sourceDuplicates.js';
 import { rateLimit } from './src/server/security/rateLimit.js';
-import { loadRuntimeState, persistRuntimeState, startRuntimeStateBackups } from './src/server/storage/runtimeStore.js';
+import {
+  getRuntimeBackupStatus,
+  loadRuntimeState,
+  persistRuntimeState,
+  startRuntimeStateBackups,
+} from './src/server/storage/runtimeStore.js';
 import { researchDataset } from './src/shared/researchData.js';
 import { seedPacks } from './src/shared/seedData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications, type SourceClassification } from './src/shared/taxonomy.js';
@@ -103,7 +108,7 @@ app.get('/api/assistant/prompts', (c) => c.json(promptTemplates));
 app.get('/api/seed-packs', (c) => c.json(seedPacks));
 
 app.get('/api/review-queue', (c) => c.json(reviewQueue));
-app.get('/api/runtime-summary', (c) =>
+app.get('/api/runtime-summary', async (c) =>
   c.json({
     reviewQueue: {
       total: reviewQueue.length,
@@ -121,6 +126,7 @@ app.get('/api/runtime-summary', (c) =>
       completed: ingestionJobs.filter((job) => job.status === 'completed').length,
       failed: ingestionJobs.filter((job) => job.status === 'failed').length,
     },
+    backups: await getRuntimeBackupStatus(),
   }),
 );
 
