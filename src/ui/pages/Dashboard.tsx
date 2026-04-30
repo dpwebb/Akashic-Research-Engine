@@ -5,12 +5,44 @@ import { evidenceGrades, guardrailRules, sourceClassifications } from '../../sha
 
 type RuntimeSummary = {
   reviewQueue: {
+    total: number;
     pending: number;
+    approved: number;
+    rejected: number;
+    highPriority: number;
+    mediumPriority: number;
+    lowPriority: number;
+  };
+  ingestionJobs: {
+    total: number;
+    queued: number;
+    running: number;
+    completed: number;
+    failed: number;
   };
 };
 
+const emptyRuntimeSummary: RuntimeSummary = {
+  reviewQueue: {
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    highPriority: 0,
+    mediumPriority: 0,
+    lowPriority: 0,
+  },
+  ingestionJobs: {
+    total: 0,
+    queued: 0,
+    running: 0,
+    completed: 0,
+    failed: 0,
+  },
+};
+
 export function Dashboard() {
-  const [pendingReviewCount, setPendingReviewCount] = useState(0);
+  const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary>(emptyRuntimeSummary);
   const sourceCount = researchDataset.sources.length;
   const claimCount = researchDataset.claims.length;
   const speculativeCount = researchDataset.claims.filter((claim) => claim.evidenceGrade === 'E').length;
@@ -28,7 +60,7 @@ export function Dashboard() {
 
       if (response.ok) {
         const summary = (await response.json()) as RuntimeSummary;
-        setPendingReviewCount(summary.reviewQueue.pending);
+        setRuntimeSummary(summary);
       }
     }
 
@@ -51,7 +83,7 @@ export function Dashboard() {
         <Metric icon={BookOpenCheck} label="Extracted claims" value={claimCount} />
         <Metric icon={FileSearch} label="Genealogy nodes" value={researchDataset.genealogy.nodes.length} />
         <Metric icon={ScrollText} label="Index records" value={getIndexRecordCount()} />
-        <Metric icon={Inbox} label="Pending review" value={pendingReviewCount} />
+        <Metric icon={Inbox} label="Pending review" value={runtimeSummary.reviewQueue.pending} />
         <Metric icon={AlertTriangle} label="Speculative claims" value={speculativeCount} />
       </div>
 
@@ -62,6 +94,32 @@ export function Dashboard() {
           <HealthStat label="Public-domain bibliography" value={publicDomainCount} total={researchDataset.index.bibliography.length} />
           <HealthStat label="Bibliography needing citation review" value={citationReviewCount} total={researchDataset.index.bibliography.length} />
           <HealthStat label="Claims requiring citation" value={researchDataset.claims.filter((claim) => claim.citationRequired).length} total={claimCount} />
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Review Operations</h2>
+        <div className="health-grid">
+          <HealthStat
+            label="High-priority review items"
+            value={runtimeSummary.reviewQueue.highPriority}
+            total={Math.max(runtimeSummary.reviewQueue.total, 1)}
+          />
+          <HealthStat
+            label="Queued full-text jobs"
+            value={runtimeSummary.ingestionJobs.queued}
+            total={Math.max(runtimeSummary.ingestionJobs.total, 1)}
+          />
+          <HealthStat
+            label="Approved review items"
+            value={runtimeSummary.reviewQueue.approved}
+            total={Math.max(runtimeSummary.reviewQueue.total, 1)}
+          />
+          <HealthStat
+            label="Failed ingestion jobs"
+            value={runtimeSummary.ingestionJobs.failed}
+            total={Math.max(runtimeSummary.ingestionJobs.total, 1)}
+          />
         </div>
       </section>
 

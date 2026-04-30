@@ -103,6 +103,9 @@ app.get('/api/runtime-summary', (c) =>
       pending: reviewQueue.filter((item) => item.status === 'pending').length,
       approved: reviewQueue.filter((item) => item.status === 'approved').length,
       rejected: reviewQueue.filter((item) => item.status === 'rejected').length,
+      highPriority: reviewQueue.filter((item) => item.reviewPriority === 'high').length,
+      mediumPriority: reviewQueue.filter((item) => item.reviewPriority === 'medium').length,
+      lowPriority: reviewQueue.filter((item) => item.reviewPriority === 'low').length,
     },
     ingestionJobs: {
       total: ingestionJobs.length,
