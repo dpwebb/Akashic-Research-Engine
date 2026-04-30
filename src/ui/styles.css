@@ -405,6 +405,12 @@ td span {
   font-weight: 800;
 }
 
+.form-success {
+  margin-bottom: 0;
+  color: #23633f;
+  font-weight: 800;
+}
+
 .assistant-output pre {
   overflow-x: auto;
   margin: 0;
@@ -556,6 +562,64 @@ td span {
   margin: 0;
   padding-left: 20px;
   color: #425046;
+}
+
+.seed-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.seed-pack {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  background: #fbfdf9;
+}
+
+.seed-pack h3,
+.seed-pack p {
+  margin-bottom: 0;
+}
+
+.seed-pack ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #425046;
+}
+
+.review-card .notes {
+  margin-bottom: 0;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.review-actions button,
+.review-actions a {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  width: fit-content;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: #173629;
+  background: #f1c66d;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.review-actions a {
+  color: #204b39;
+  background: #eef3ea;
 }
 
 .framework-card svg {

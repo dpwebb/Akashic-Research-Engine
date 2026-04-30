@@ -90,3 +90,25 @@ export type DiscoverySearchResponse = {
     inspectedPages: number;
   };
 };
+
+export type SeedPack = {
+  id: string;
+  name: string;
+  description: string;
+  querySeeds: string[];
+  sourceIds: string[];
+};
+
+export type ReviewQueueItem = {
+  id: string;
+  title: string;
+  url: string;
+  domain: string;
+  proposedSourceType: SourceClassification;
+  summary: string;
+  provenance: 'curated seed' | 'discovery search';
+  status: 'pending' | 'approved' | 'rejected';
+  confidenceLevel: 'high' | 'medium' | 'low';
+  citationNotes: string;
+  discoveredAt: string;
+};

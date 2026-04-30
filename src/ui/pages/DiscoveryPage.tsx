@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { ExternalLink, Filter, Search } from 'lucide-react';
+import { ExternalLink, Filter, Plus, Search } from 'lucide-react';
 import { sourceClassifications, type SourceClassification } from '../../shared/taxonomy.js';
 import type { DiscoverySearchResponse } from '../../shared/types.js';
 
@@ -25,6 +25,7 @@ export function DiscoveryPage() {
   const [minRelevance, setMinRelevance] = useState(0);
   const [response, setResponse] = useState<DiscoverySearchResponse | null>(null);
   const [error, setError] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
   const searchPayload = useMemo(
@@ -86,6 +87,36 @@ export function DiscoveryPage() {
         ? current.filter((item) => item !== sourceType)
         : [...current, sourceType],
     );
+  }
+
+  async function saveToReviewQueue(result: DiscoverySearchResponse['results'][number]) {
+    setSaveMessage('');
+    setError('');
+
+    try {
+      const saveResponse = await fetch('/api/review-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: result.pageTitle || result.title,
+          url: result.url,
+          domain: result.domain,
+          proposedSourceType: result.sourceType ?? 'speculative',
+          summary: result.pageDescription || result.snippet || result.pageExcerpt || 'Discovery result pending review.',
+          confidenceLevel: result.confidenceLevel ?? 'low',
+          citationNotes: result.researchNotes.join(' '),
+        }),
+      });
+
+      if (!saveResponse.ok) {
+        const data = await saveResponse.json();
+        throw new Error(data.error ?? 'Could not save result.');
+      }
+
+      setSaveMessage('Saved to review queue.');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save result.');
+    }
   }
 
   return (
@@ -216,6 +247,7 @@ export function DiscoveryPage() {
           {isSearching ? 'Searching...' : 'Run Search'}
         </button>
         {error && <p className="form-error">{error}</p>}
+        {saveMessage && <p className="form-success">{saveMessage}</p>}
       </form>
 
       {response && (
@@ -290,9 +322,15 @@ export function DiscoveryPage() {
                   ))}
                 </ul>
                 {result.url && (
-                  <a href={result.url} target="_blank" rel="noreferrer">
-                    Open result <ExternalLink aria-hidden="true" />
-                  </a>
+                  <div className="review-actions">
+                    <button type="button" onClick={() => saveToReviewQueue(result)}>
+                      <Plus aria-hidden="true" />
+                      Send to Review
+                    </button>
+                    <a href={result.url} target="_blank" rel="noreferrer">
+                      Open result <ExternalLink aria-hidden="true" />
+                    </a>
+                  </div>
                 )}
               </article>
             ))}

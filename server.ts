@@ -7,12 +7,15 @@ import { getIntegrationStatus } from './src/server/integrations/status.js';
 import { generateResearchAssistantOutput } from './src/server/openai/researchAssistant.js';
 import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
 import { researchDataset } from './src/shared/researchData.js';
+import { seedPacks, seedReviewQueue } from './src/shared/seedData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications } from './src/shared/taxonomy.js';
 import { promptTemplates } from './src/shared/promptTemplates.js';
+import type { ReviewQueueItem } from './src/shared/types.js';
 
 const port = Number.parseInt(process.env.PORT ?? '3500', 10);
 const host = process.env.HOST ?? '0.0.0.0';
 const app = new Hono();
+const reviewQueue: ReviewQueueItem[] = [...seedReviewQueue];
 
 app.use('/api/*', logger());
 
@@ -51,6 +54,56 @@ app.get('/api/claims', (c) => c.json(researchDataset.claims));
 app.get('/api/genealogy', (c) => c.json(researchDataset.genealogy));
 
 app.get('/api/assistant/prompts', (c) => c.json(promptTemplates));
+
+app.get('/api/seed-packs', (c) => c.json(seedPacks));
+
+app.get('/api/review-queue', (c) => c.json(reviewQueue));
+
+const reviewQueueItemSchema = z.object({
+  title: z.string().min(2).max(240),
+  url: z.string().url(),
+  domain: z.string().min(2).max(160),
+  proposedSourceType: z.enum(sourceClassifications),
+  summary: z.string().min(1).max(1400),
+  confidenceLevel: z.enum(['high', 'medium', 'low']).default('low'),
+  citationNotes: z.string().min(1).max(1200),
+});
+
+app.post('/api/review-queue', async (c) => {
+  try {
+    const input = reviewQueueItemSchema.parse(await c.req.json());
+    const existing = reviewQueue.find((item) => item.url === input.url);
+
+    if (existing) {
+      return c.json(existing);
+    }
+
+    const item: ReviewQueueItem = {
+      id: `discovery-${Date.now()}-${slugify(input.url)}`,
+      ...input,
+      provenance: 'discovery search',
+      status: 'pending',
+      discoveredAt: new Date().toISOString(),
+    };
+
+    reviewQueue.unshift(item);
+    return c.json(item, 201);
+  } catch (error) {
+    console.error('[Review Queue Add]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Could not add review item.' }, 400);
+  }
+});
+
+app.patch('/api/review-queue/:id/status', async (c) => {
+  const item = reviewQueue.find((entry) => entry.id === c.req.param('id'));
+  if (!item) {
+    return c.json({ error: 'Review item not found' }, 404);
+  }
+
+  const input = z.object({ status: z.enum(['pending', 'approved', 'rejected']) }).parse(await c.req.json());
+  item.status = input.status;
+  return c.json(item);
+});
 
 const discoverySearchSchema = z.object({
   query: z.string().min(3).max(240),
@@ -109,6 +162,10 @@ app.post('/api/assistant/generate', async (c) => {
 });
 
 app.get('/api/addition-builder/frameworks', (c) => c.json(researchDataset.additionFrameworks));
+
+function slugify(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
+}
 
 app.use('/_assets/*', serveStatic({ root: './dist' }));
 app.use('/assets/*', serveStatic({ root: './dist' }));
