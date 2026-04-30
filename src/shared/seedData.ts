@@ -60,6 +60,7 @@ export const seedReviewQueue: ReviewQueueItem[] = [
     status: 'pending',
     confidenceLevel: 'medium',
     citationNotes: 'Useful as a movement reference; verify quoted passages against primary editions.',
+    reviewerNotes: 'Needs quotation-level verification before promotion.',
     discoveredAt: '2026-04-30T00:00:00.000Z',
   },
   {
@@ -73,6 +74,7 @@ export const seedReviewQueue: ReviewQueueItem[] = [
     status: 'pending',
     confidenceLevel: 'medium',
     citationNotes: 'Use for bibliographic triangulation, not as the primary text when RS Archive is available.',
+    reviewerNotes: 'Check edition metadata and archive availability.',
     discoveredAt: '2026-04-30T00:00:00.000Z',
   },
   {
@@ -86,6 +88,7 @@ export const seedReviewQueue: ReviewQueueItem[] = [
     status: 'pending',
     confidenceLevel: 'medium',
     citationNotes: 'Treat as movement testimony and archive material; do not treat metaphysical claims as verified.',
+    reviewerNotes: 'Review for extractable Cayce reading IDs or page references.',
     discoveredAt: '2026-04-30T00:00:00.000Z',
   },
   {
@@ -99,6 +102,7 @@ export const seedReviewQueue: ReviewQueueItem[] = [
     status: 'pending',
     confidenceLevel: 'medium',
     citationNotes: 'Primary esoteric source; cite as testimony within Theosophical literature.',
+    reviewerNotes: 'Review public-domain scan quality and edition details.',
     discoveredAt: '2026-04-30T00:00:00.000Z',
   },
 ];

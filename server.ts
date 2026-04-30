@@ -69,6 +69,7 @@ const reviewQueueItemSchema = z.object({
   summary: z.string().min(1).max(1400),
   confidenceLevel: z.enum(['high', 'medium', 'low']).default('low'),
   citationNotes: z.string().min(1).max(1200),
+  reviewerNotes: z.string().max(1200).optional(),
 });
 
 app.post('/api/review-queue', async (c) => {
@@ -102,8 +103,15 @@ app.patch('/api/review-queue/:id/status', async (c) => {
     return c.json({ error: 'Review item not found' }, 404);
   }
 
-  const input = z.object({ status: z.enum(['pending', 'approved', 'rejected']) }).parse(await c.req.json());
+  const input = z
+    .object({
+      status: z.enum(['pending', 'approved', 'rejected']),
+      reviewerNotes: z.string().max(1200).optional(),
+    })
+    .parse(await c.req.json());
   item.status = input.status;
+  item.reviewedAt = new Date().toISOString();
+  item.reviewerNotes = input.reviewerNotes ?? item.reviewerNotes;
   return c.json(item);
 });
 

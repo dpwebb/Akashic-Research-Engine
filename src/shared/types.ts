@@ -122,6 +122,8 @@ export type ReviewQueueItem = {
   confidenceLevel: 'high' | 'medium' | 'low';
   citationNotes: string;
   discoveredAt: string;
+  reviewedAt?: string;
+  reviewerNotes?: string;
 };
 
 export type ResearchPerson = {

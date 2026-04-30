@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Check, ExternalLink, X } from 'lucide-react';
+import { sourceClassifications, type SourceClassification } from '../../shared/taxonomy.js';
 import type { ReviewQueueItem, SeedPack } from '../../shared/types.js';
+
+type StatusFilter = 'all' | ReviewQueueItem['status'];
+type ProvenanceFilter = 'all' | ReviewQueueItem['provenance'];
 
 export function SeedQueuePage() {
   const [seedPacks, setSeedPacks] = useState<SeedPack[]>([]);
   const [queueItems, setQueueItems] = useState<ReviewQueueItem[]>([]);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [provenanceFilter, setProvenanceFilter] = useState<ProvenanceFilter>('all');
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<'all' | SourceClassification>('all');
 
   useEffect(() => {
     void loadSeedData();
@@ -47,6 +55,29 @@ export function SeedQueuePage() {
 
   const pendingCount = queueItems.filter((item) => item.status === 'pending').length;
   const approvedCount = queueItems.filter((item) => item.status === 'approved').length;
+  const filteredQueueItems = queueItems.filter((item) => {
+    const searchableText = [item.title, item.domain, item.summary, item.citationNotes, item.reviewerNotes]
+      .join(' ')
+      .toLocaleLowerCase();
+
+    if (query.trim() && !searchableText.includes(query.trim().toLocaleLowerCase())) {
+      return false;
+    }
+
+    if (statusFilter !== 'all' && item.status !== statusFilter) {
+      return false;
+    }
+
+    if (provenanceFilter !== 'all' && item.provenance !== provenanceFilter) {
+      return false;
+    }
+
+    if (sourceTypeFilter !== 'all' && item.proposedSourceType !== sourceTypeFilter) {
+      return false;
+    }
+
+    return true;
+  });
 
   return (
     <section className="page-stack">
@@ -82,8 +113,8 @@ export function SeedQueuePage() {
               <p>{pack.description}</p>
               <p className="muted">{pack.sourceIds.length} canonical sources</p>
               <ul>
-                {pack.querySeeds.map((query) => (
-                  <li key={query}>{query}</li>
+                {pack.querySeeds.map((seedQuery) => (
+                  <li key={seedQuery}>{seedQuery}</li>
                 ))}
               </ul>
             </article>
@@ -91,8 +122,53 @@ export function SeedQueuePage() {
         </div>
       </section>
 
+      <section className="filter-panel">
+        <label>
+          Search queue
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Filter by title, domain, notes, or summary"
+          />
+        </label>
+        <label>
+          Status
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+            <option value="all">All status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </label>
+        <label>
+          Provenance
+          <select
+            value={provenanceFilter}
+            onChange={(event) => setProvenanceFilter(event.target.value as ProvenanceFilter)}
+          >
+            <option value="all">All provenance</option>
+            <option value="curated seed">Curated seed</option>
+            <option value="discovery search">Discovery search</option>
+          </select>
+        </label>
+        <label>
+          Source class
+          <select
+            value={sourceTypeFilter}
+            onChange={(event) => setSourceTypeFilter(event.target.value as typeof sourceTypeFilter)}
+          >
+            <option value="all">All classes</option>
+            {sourceClassifications.map((sourceType) => (
+              <option key={sourceType} value={sourceType}>
+                {sourceType}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
       <section className="source-list">
-        {queueItems.map((item) => (
+        {filteredQueueItems.map((item) => (
           <article className="source-card review-card" key={item.id}>
             <div>
               <div className="result-meta">
@@ -102,12 +178,14 @@ export function SeedQueuePage() {
               </div>
               <h2>{item.title}</h2>
               <p className="muted">
-                {item.domain} · confidence {item.confidenceLevel} · discovered{' '}
+                {item.domain} - confidence {item.confidenceLevel} - discovered{' '}
                 {new Date(item.discoveredAt).toLocaleDateString()}
+                {item.reviewedAt ? ` - reviewed ${new Date(item.reviewedAt).toLocaleDateString()}` : ''}
               </p>
             </div>
             <p>{item.summary}</p>
             <p className="notes">{item.citationNotes}</p>
+            {item.reviewerNotes && <p className="muted">Reviewer notes: {item.reviewerNotes}</p>}
             <div className="review-actions">
               <button type="button" onClick={() => updateStatus(item.id, 'approved')}>
                 <Check aria-hidden="true" />
