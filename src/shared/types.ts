@@ -225,3 +225,20 @@ export type SourceImportPreview = {
   extractionStatus: 'completed' | 'failed';
   warnings: string[];
 };
+
+export type IngestionJob = {
+  id: string;
+  url: string;
+  domain: string;
+  title: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  sourceType: SourceClassification;
+  citationStatus: 'complete' | 'partial' | 'needs review';
+  wordCount: number;
+  fullTextCandidate: boolean;
+  qualityFlags: string[];
+  extractionNotes: string;
+  createdAt: string;
+  completedAt?: string;
+  errorMessage?: string;
+};

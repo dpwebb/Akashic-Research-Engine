@@ -156,7 +156,15 @@ create table genealogy_edges (
 create table ingestion_jobs (
   id uuid primary key default gen_random_uuid(),
   url text not null,
+  domain text not null default '',
+  title text not null default '',
   status text not null check (status in ('queued', 'running', 'completed', 'failed')),
+  source_type text not null default '',
+  citation_status text not null default 'needs review' check (citation_status in ('complete', 'partial', 'needs review')),
+  word_count integer not null default 0,
+  full_text_candidate boolean not null default false,
+  quality_flags text[] not null default '{}',
+  extraction_notes text not null default '',
   error_message text,
   created_at timestamptz not null default now(),
   completed_at timestamptz

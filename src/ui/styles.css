@@ -886,6 +886,10 @@ td span {
   max-width: 960px;
 }
 
+.import-queue-panel {
+  max-width: 960px;
+}
+
 .compact-panel {
   padding: 14px;
   box-shadow: none;

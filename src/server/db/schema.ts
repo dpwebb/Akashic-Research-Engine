@@ -182,7 +182,15 @@ export type AssistantOutputTable = {
 export type IngestionJobTable = {
   id: Generated<string>;
   url: string;
+  domain: string;
+  title: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
+  source_type: string;
+  citation_status: 'complete' | 'partial' | 'needs review';
+  word_count: number;
+  full_text_candidate: boolean;
+  quality_flags: string[];
+  extraction_notes: string;
   error_message: string | null;
   created_at: Generated<Date>;
   completed_at: Date | null;

@@ -11,12 +11,13 @@ import { researchDataset } from './src/shared/researchData.js';
 import { seedPacks, seedReviewQueue } from './src/shared/seedData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications } from './src/shared/taxonomy.js';
 import { promptTemplates } from './src/shared/promptTemplates.js';
-import type { ReviewQueueItem } from './src/shared/types.js';
+import type { IngestionJob, ReviewQueueItem } from './src/shared/types.js';
 
 const port = Number.parseInt(process.env.PORT ?? '3500', 10);
 const host = process.env.HOST ?? '0.0.0.0';
 const app = new Hono();
 const reviewQueue: ReviewQueueItem[] = [...seedReviewQueue];
+const ingestionJobs: IngestionJob[] = [];
 
 app.use('/api/*', logger());
 
@@ -128,6 +129,44 @@ app.post('/api/source-import/preview', async (c) => {
   } catch (error) {
     console.error('[Source Import Preview]', error);
     return c.json({ error: error instanceof Error ? error.message : 'Source import preview failed.' }, 400);
+  }
+});
+
+app.get('/api/ingestion-jobs', (c) => c.json(ingestionJobs));
+
+const ingestionJobSchema = z.object({
+  url: z.string().url(),
+  domain: z.string().min(2).max(160),
+  title: z.string().min(1).max(240),
+  sourceType: z.enum(sourceClassifications),
+  citationStatus: z.enum(['complete', 'partial', 'needs review']),
+  wordCount: z.number().int().min(0).max(5_000_000),
+  fullTextCandidate: z.boolean(),
+  qualityFlags: z.array(z.string().min(1).max(220)).max(12).default([]),
+  extractionNotes: z.string().max(1200).default(''),
+});
+
+app.post('/api/ingestion-jobs', async (c) => {
+  try {
+    const input = ingestionJobSchema.parse(await c.req.json());
+    const existing = ingestionJobs.find((job) => job.url === input.url && job.status !== 'failed');
+
+    if (existing) {
+      return c.json(existing);
+    }
+
+    const job: IngestionJob = {
+      id: `ingestion-${Date.now()}-${slugify(input.url)}`,
+      ...input,
+      status: 'queued',
+      createdAt: new Date().toISOString(),
+    };
+
+    ingestionJobs.unshift(job);
+    return c.json(job, 201);
+  } catch (error) {
+    console.error('[Ingestion Job Add]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Could not queue ingestion job.' }, 400);
   }
 });
 

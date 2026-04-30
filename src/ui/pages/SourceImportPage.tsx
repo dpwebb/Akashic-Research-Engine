@@ -1,6 +1,6 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { ExternalLink, Import, Plus } from 'lucide-react';
-import type { SourceImportPreview } from '../../shared/types.js';
+import type { IngestionJob, SourceImportPreview } from '../../shared/types.js';
 
 export function SourceImportPage() {
   const [url, setUrl] = useState('https://www.britannica.com/topic/Akashic-record');
@@ -8,6 +8,19 @@ export function SourceImportPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isQueuing, setIsQueuing] = useState(false);
+  const [ingestionJobs, setIngestionJobs] = useState<IngestionJob[]>([]);
+
+  useEffect(() => {
+    void loadIngestionJobs();
+  }, []);
+
+  async function loadIngestionJobs() {
+    const response = await fetch('/api/ingestion-jobs');
+    if (response.ok) {
+      setIngestionJobs(await response.json());
+    }
+  }
 
   async function previewSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,6 +87,54 @@ export function SourceImportPage() {
       setMessage('Source sent to review queue.');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not send source to review.');
+    }
+  }
+
+  async function queueFullTextExtraction() {
+    if (!preview) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setIsQueuing(true);
+
+    try {
+      const response = await fetch('/api/ingestion-jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: preview.url,
+          domain: preview.domain,
+          title: preview.title,
+          sourceType: preview.proposedSourceType,
+          citationStatus: preview.citationStatus,
+          wordCount: preview.wordCount,
+          fullTextCandidate: preview.fullTextCandidate,
+          qualityFlags: preview.qualityFlags,
+          extractionNotes: [
+            `Content type: ${preview.contentType}.`,
+            `Detected author: ${preview.detectedAuthor || 'pending review'}.`,
+            `Detected date: ${preview.detectedDate || 'pending review'}.`,
+            preview.fullTextCandidate ? 'Preview marked as a full-text candidate.' : 'Preview did not meet full-text candidate thresholds.',
+          ].join(' '),
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? 'Could not queue full-text extraction.');
+      }
+
+      setIngestionJobs((current) => {
+        const withoutDuplicate = current.filter((job) => job.id !== data.id && job.url !== data.url);
+        return [data, ...withoutDuplicate];
+      });
+      setMessage('Full-text extraction job queued.');
+    } catch (queueError) {
+      setError(queueError instanceof Error ? queueError.message : 'Could not queue full-text extraction.');
+    } finally {
+      setIsQueuing(false);
     }
   }
 
@@ -155,12 +216,45 @@ export function SourceImportPage() {
               <Plus aria-hidden="true" />
               Send to Review
             </button>
+            <button type="button" onClick={queueFullTextExtraction} disabled={isQueuing || preview.extractionStatus === 'failed'}>
+              <Import aria-hidden="true" />
+              {isQueuing ? 'Queueing...' : 'Queue Full Text'}
+            </button>
             <a href={preview.url} target="_blank" rel="noreferrer">
               Open source <ExternalLink aria-hidden="true" />
             </a>
           </div>
         </article>
       )}
+
+      <section className="panel import-queue-panel">
+        <h2>Full-Text Extraction Queue</h2>
+        {ingestionJobs.length === 0 ? (
+          <p className="muted">No extraction jobs have been queued in this session.</p>
+        ) : (
+          <div className="source-list">
+            {ingestionJobs.map((job) => (
+              <article className="index-card compact-panel" key={job.id}>
+                <div className="result-meta">
+                  <span className="tag">{job.status}</span>
+                  <span className="tag">{job.sourceType}</span>
+                  <span className="tag">{job.citationStatus}</span>
+                  {job.fullTextCandidate && <span className="tag">full text</span>}
+                </div>
+                <h3>{job.title}</h3>
+                <p className="muted">
+                  {job.domain} - {job.wordCount.toLocaleString()} preview words
+                </p>
+                <p>{job.extractionNotes}</p>
+                {job.qualityFlags.length > 0 && <p className="notes">{job.qualityFlags.join(' ')}</p>}
+                <a href={job.url} target="_blank" rel="noreferrer">
+                  Open source <ExternalLink aria-hidden="true" />
+                </a>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </section>
   );
 }
