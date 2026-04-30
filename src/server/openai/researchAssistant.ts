@@ -19,7 +19,6 @@ export async function generateResearchAssistantOutput(input: ResearchAssistantIn
 
   const response = await client.responses.create({
     model,
-    reasoning: { effort: 'low' },
     input: [
       {
         role: 'system',
