@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { getIntegrationStatus } from './src/server/integrations/status.js';
 import { generateResearchAssistantOutput } from './src/server/openai/researchAssistant.js';
 import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
+import { previewSourceImport } from './src/server/importing/sourceImport.js';
 import { researchDataset } from './src/shared/researchData.js';
 import { seedPacks, seedReviewQueue } from './src/shared/seedData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications } from './src/shared/taxonomy.js';
@@ -113,6 +114,21 @@ app.patch('/api/review-queue/:id/status', async (c) => {
   item.reviewedAt = new Date().toISOString();
   item.reviewerNotes = input.reviewerNotes ?? item.reviewerNotes;
   return c.json(item);
+});
+
+const sourceImportPreviewSchema = z.object({
+  url: z.string().min(3).max(2000),
+});
+
+app.post('/api/source-import/preview', async (c) => {
+  try {
+    const input = sourceImportPreviewSchema.parse(await c.req.json());
+    const preview = await previewSourceImport(input.url);
+    return c.json(preview);
+  } catch (error) {
+    console.error('[Source Import Preview]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Source import preview failed.' }, 400);
+  }
 });
 
 const discoverySearchSchema = z.object({

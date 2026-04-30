@@ -827,6 +827,26 @@ td span {
   max-width: 920px;
 }
 
+.import-preview-card {
+  max-width: 960px;
+}
+
+.compact-panel {
+  padding: 14px;
+  box-shadow: none;
+}
+
+.compact-panel h3,
+.import-excerpt h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.import-excerpt {
+  max-width: none;
+  padding: 14px;
+}
+
 .framework-card svg {
   color: #8a4b24;
 }

@@ -190,3 +190,20 @@ export type BibliographicRecord = {
   stableCitation: string;
   pageReference: string;
 };
+
+export type SourceImportPreviewRequest = {
+  url: string;
+};
+
+export type SourceImportPreview = {
+  url: string;
+  domain: string;
+  title: string;
+  description: string;
+  textExcerpt: string;
+  proposedSourceType: SourceClassification;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  citationNotes: string;
+  extractionStatus: 'completed' | 'failed';
+  warnings: string[];
+};
