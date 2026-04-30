@@ -123,6 +123,6 @@ jobs:
             pnpm run typecheck
             pnpm run build
             docker rm -f akashic-research-engine 2>/dev/null || true
-            docker compose up -d --build akashic-research-engine
+            docker compose up -d --build
             git log -1 --oneline
           REMOTE

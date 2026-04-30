@@ -220,7 +220,13 @@ async function loadStateFromPostgres(): Promise<RuntimeState | null> {
     `;
 
     if (rows.length === 0) {
-      return normalizeRuntimeState({});
+      const initialState = normalizeRuntimeState({});
+      await sql`
+        insert into app_runtime_state (id, state, updated_at)
+        values ('primary', ${sql.json(initialState)}, now())
+        on conflict (id) do nothing
+      `;
+      return initialState;
     }
 
     return normalizeRuntimeState(rows[0].state);

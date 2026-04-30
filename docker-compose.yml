@@ -1,4 +1,22 @@
 services:
+  akashic-research-engine-db:
+    image: postgres:16-alpine
+    container_name: akashic-research-engine-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-akashic_research_engine}
+      POSTGRES_USER: ${POSTGRES_USER:-akashic}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-akashic_local_password}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - akashic-research-engine-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
   akashic-research-engine:
     build:
       context: .
@@ -8,11 +26,16 @@ services:
     restart: unless-stopped
     env_file:
       - .env.production
+    depends_on:
+      akashic-research-engine-db:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3500
       HOST: 0.0.0.0
-    network_mode: host
+      DATABASE_URL: postgres://akashic:akashic_local_password@akashic-research-engine-db:5432/akashic_research_engine
+    ports:
+      - "127.0.0.1:3500:3500"
     labels:
       - traefik.enable=true
       - traefik.http.routers.akashic-research-engine-web.rule=Host(`akashicresearch.info`) || Host(`www.akashicresearch.info`)
@@ -29,3 +52,6 @@ services:
       - traefik.http.middlewares.akashic-research-engine-security-headers.headers.stsincludesubdomains=true
       - traefik.http.middlewares.akashic-research-engine-security-headers.headers.forcestsheader=true
       - traefik.http.services.akashic-research-engine.loadbalancer.server.port=3500
+
+volumes:
+  akashic-research-engine-db-data:

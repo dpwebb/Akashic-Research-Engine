@@ -30,7 +30,7 @@ Runtime pattern:
 frontend: Vite + React + TypeScript
 server: Hono + TypeScript
 package manager: pnpm 10 via Corepack
-database: PostgreSQL planned
+database: PostgreSQL container managed by Docker Compose
 proxy: Traefik with Let's Encrypt
 ```
 
@@ -72,7 +72,8 @@ corepack prepare pnpm@10 --activate
 pnpm install --frozen-lockfile
 pnpm run typecheck
 pnpm run build
-docker compose up -d --build akashic-research-engine
+cp .env.example .env.production
+docker compose up -d --build
 ```
 
 The VPS must already have Docker and the Hostinger Traefik stack available, matching the other apps.
@@ -138,16 +139,23 @@ pnpm install --frozen-lockfile
 pnpm run typecheck
 pnpm run build
 docker rm -f akashic-research-engine 2>/dev/null || true
-docker compose up -d --build akashic-research-engine
+docker compose up -d --build
 ```
 
 ## Required Runtime Secrets
 
 The current build includes seeded local data and does not require secrets to start.
 
-Before live persistence or AI generation is enabled, configure:
+Before live AI generation is enabled, configure:
 
-- `DATABASE_URL`
 - `OPENAI_API_KEY`
+
+`DATABASE_URL` is functional by default when the included Docker Compose PostgreSQL service is running:
+
+```text
+postgres://akashic:akashic_local_password@127.0.0.1:5432/akashic_research_engine
+```
+
+For a public production VPS, replace the default `POSTGRES_PASSWORD` and matching `DATABASE_URL` in the ignored `.env.production` file before starting the stack.
 
 See `docs/hostinger-api-access-standard.md` for the shared provider naming rules used across Hostinger apps.
