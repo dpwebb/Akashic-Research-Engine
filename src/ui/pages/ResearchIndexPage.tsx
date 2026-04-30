@@ -89,8 +89,13 @@ export function ResearchIndexPage() {
               record.editionNotes,
               record.publisher,
               record.rightsStatus,
+              record.sourceClassification,
+              record.citationStatus,
+              record.accessType,
+              record.reviewStatus,
               record.stableCitation,
               record.pageReference,
+              record.auditNote,
             ],
             normalizedQuery,
           ) && matchesDateRange(record.publicationDate, dateFrom, dateTo),
@@ -227,15 +232,22 @@ export function ResearchIndexPage() {
         <div className="source-list">
           {filtered.bibliography.map((record) => (
             <article className="index-card timeline-record" key={record.id}>
-              <span className="tag">{record.rightsStatus}</span>
+              <div className="result-meta">
+                <span className="tag">{record.rightsStatus}</span>
+                <span className="tag">{record.sourceClassification}</span>
+                <span className="tag">{record.citationStatus}</span>
+                <span className="tag">{record.reviewStatus}</span>
+              </div>
               <h2>{record.title}</h2>
               <p className="muted">
                 {record.author} - {record.publicationDate}
               </p>
               <p>{record.editionNotes}</p>
               <p className="muted">Publisher: {record.publisher}</p>
+              <p className="matched-terms">Access: {record.accessType}</p>
               <p className="notes">{record.stableCitation}</p>
               <p className="muted">{record.pageReference}</p>
+              <p className="notes">{record.auditNote}</p>
               <a href={record.archiveUrl} target="_blank" rel="noreferrer">
                 Open record
               </a>

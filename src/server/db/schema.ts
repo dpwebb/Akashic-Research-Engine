@@ -69,8 +69,13 @@ export type BibliographicRecordTable = {
   publisher: string;
   archive_url: string;
   rights_status: 'public domain' | 'copyrighted' | 'unknown';
+  source_classification: string;
+  citation_status: 'complete' | 'partial' | 'needs review';
+  access_type: 'full text' | 'catalog/reference' | 'movement page';
+  review_status: 'reviewed' | 'needs page review' | 'lead only';
   stable_citation: string;
   page_reference: string;
+  audit_note: string;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 };

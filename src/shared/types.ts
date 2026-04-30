@@ -189,8 +189,13 @@ export type BibliographicRecord = {
   publisher: string;
   archiveUrl: string;
   rightsStatus: 'public domain' | 'copyrighted' | 'unknown';
+  sourceClassification: SourceClassification;
+  citationStatus: 'complete' | 'partial' | 'needs review';
+  accessType: 'full text' | 'catalog/reference' | 'movement page';
+  reviewStatus: 'reviewed' | 'needs page review' | 'lead only';
   stableCitation: string;
   pageReference: string;
+  auditNote: string;
 };
 
 export type SourceImportPreviewRequest = {

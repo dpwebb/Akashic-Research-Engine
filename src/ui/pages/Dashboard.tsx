@@ -11,6 +11,9 @@ export function Dashboard() {
   const publicDomainCount = researchDataset.index.bibliography.filter(
     (record) => record.rightsStatus === 'public domain',
   ).length;
+  const citationReviewCount = researchDataset.index.bibliography.filter(
+    (record) => record.citationStatus === 'needs review',
+  ).length;
   const pendingReviewCount = seedReviewQueue.filter((item) => item.status === 'pending').length;
 
   return (
@@ -38,6 +41,7 @@ export function Dashboard() {
         <div className="health-grid">
           <HealthStat label="Primary esoteric sources" value={primarySourceCount} total={sourceCount} />
           <HealthStat label="Public-domain bibliography" value={publicDomainCount} total={researchDataset.index.bibliography.length} />
+          <HealthStat label="Bibliography needing citation review" value={citationReviewCount} total={researchDataset.index.bibliography.length} />
           <HealthStat label="Claims requiring citation" value={researchDataset.claims.filter((claim) => claim.citationRequired).length} total={claimCount} />
         </div>
       </section>

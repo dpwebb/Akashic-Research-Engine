@@ -835,13 +835,34 @@ const bibliography: BibliographicRecord[] = sources.map((source) => ({
   title: source.title,
   author: source.author,
   publicationDate: source.date,
-  editionNotes: source.date === 'reference article' || source.date === 'reference entry' ? 'Online reference entry' : 'Edition details require review',
+  editionNotes: inferEditionNotes(source),
   publisher: inferPublisher(source.url, source.author),
   archiveUrl: source.url,
   rightsStatus: source.url.includes('archive.org') || Number.parseInt(source.date, 10) < 1929 ? 'public domain' : 'unknown',
+  sourceClassification: source.sourceType,
+  citationStatus: inferCitationStatus(source),
+  accessType: inferAccessType(source.url),
+  reviewStatus: inferReviewStatus(source),
   stableCitation: `${source.author}. ${source.title}. ${source.date}. ${source.url}`,
-  pageReference: 'page/chapter reference pending review',
+  pageReference: inferPageReference(source),
+  auditNote: inferAuditNote(source),
 }));
+
+function inferEditionNotes(source: Source): string {
+  if (source.date === 'reference article' || source.date === 'reference entry' || source.date === 'modern archive page') {
+    return 'Online reference entry; archive date and revision history should be captured during citation review';
+  }
+
+  if (source.url.includes('archive.org')) {
+    return 'Digitized scan available; edition, imprint, and page images should be verified against the scan';
+  }
+
+  if (source.url.includes('rsarchive.org')) {
+    return 'Online archive transcription; verify against the cited GA edition when page-level citation is required';
+  }
+
+  return 'Edition details require review';
+}
 
 function inferPublisher(url: string, author: string): string {
   if (url.includes('archive.org')) {
@@ -869,6 +890,70 @@ function inferPublisher(url: string, author: string): string {
   }
 
   return author;
+}
+
+function inferAccessType(url: string): BibliographicRecord['accessType'] {
+  if (url.includes('archive.org') || url.endsWith('.pdf') || url.includes('/Books/')) {
+    return 'full text';
+  }
+
+  if (url.includes('edgarcayce.org') || url.includes('theosophy.wiki')) {
+    return 'movement page';
+  }
+
+  return 'catalog/reference';
+}
+
+function inferCitationStatus(source: Source): BibliographicRecord['citationStatus'] {
+  if (source.url.includes('archive.org') && Number.parseInt(source.date, 10) < 1929) {
+    return 'partial';
+  }
+
+  if (source.date === 'reference entry' || source.date === 'reference article' || source.date === 'modern archive page') {
+    return 'needs review';
+  }
+
+  return 'partial';
+}
+
+function inferReviewStatus(source: Source): BibliographicRecord['reviewStatus'] {
+  if (source.confidenceLevel === 'low') {
+    return 'lead only';
+  }
+
+  if (source.url.includes('archive.org') || Number.parseInt(source.date, 10) < 1929) {
+    return 'needs page review';
+  }
+
+  return 'reviewed';
+}
+
+function inferPageReference(source: Source): string {
+  if (source.url.includes('rsarchive.org')) {
+    return 'chapter/section reference pending against GA source';
+  }
+
+  if (source.url.includes('archive.org') || source.url.endsWith('.pdf')) {
+    return 'page image reference pending review';
+  }
+
+  return 'page/chapter reference pending review';
+}
+
+function inferAuditNote(source: Source): string {
+  if (source.confidenceLevel === 'low') {
+    return 'Lead source only; replace with stronger primary, academic, or archive citation before treating as authority.';
+  }
+
+  if (source.sourceType === 'primary esoteric' || source.sourceType === 'modern spiritual') {
+    return 'Primary for documenting the claim made by the movement or author; not proof of metaphysical truth.';
+  }
+
+  if (source.sourceType === 'religious/comparative') {
+    return 'Use for term-history and comparison; do not collapse South Asian akasha into Western occult record claims.';
+  }
+
+  return 'Secondary context source; verify specific historical claims against primary records where possible.';
 }
 
 export const researchDataset = {

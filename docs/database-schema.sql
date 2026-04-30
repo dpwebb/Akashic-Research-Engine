@@ -75,8 +75,13 @@ create table bibliographic_records (
   publisher text not null default '',
   archive_url text not null default '',
   rights_status text not null check (rights_status in ('public domain', 'copyrighted', 'unknown')),
+  source_classification text not null default '',
+  citation_status text not null default 'needs review' check (citation_status in ('complete', 'partial', 'needs review')),
+  access_type text not null default 'catalog/reference' check (access_type in ('full text', 'catalog/reference', 'movement page')),
+  review_status text not null default 'needs page review' check (review_status in ('reviewed', 'needs page review', 'lead only')),
   stable_citation text not null default '',
   page_reference text not null default '',
+  audit_note text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
