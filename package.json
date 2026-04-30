@@ -3,15 +3,33 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "build": "tsc",
-    "build:site": "node scripts/build-site.mjs",
+    "build": "vite build && tsc -p tsconfig.server.json",
     "check:production-services": "bash scripts/check-production-services.sh",
     "check:source-of-truth": "node scripts/check-github-source-of-truth.mjs",
-    "start": "node server/productionServer.mjs",
-    "typecheck": "tsc --noEmit"
+    "dev": "vite",
+    "start": "tsx server.ts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@vitejs/plugin-react-swc": "^4.2.2",
+    "hono": "^4.10.7",
+    "kysely": "^0.28.8",
+    "lucide-react": "^0.555.0",
+    "postgres": "^3.4.7",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-router-dom": "^7.9.6",
+    "tsx": "^4.21.0",
+    "vite": "^7.2.7",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
-    "typescript": "^5.9.0"
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
   }
 }

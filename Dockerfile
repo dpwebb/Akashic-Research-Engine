@@ -1,23 +1,18 @@
-FROM node:22-alpine AS build
+FROM node:22-bookworm-slim
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
 COPY . .
-RUN npm run build
-RUN npm run build:site
+RUN pnpm run build
 
-FROM node:22-alpine AS runtime
-
-WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3500
 ENV HOST=0.0.0.0
 
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY --from=build /app/site ./site
-COPY server ./server
-
 EXPOSE 3500
-CMD ["npm", "start"]
+CMD ["pnpm", "tsx", "server.ts"]

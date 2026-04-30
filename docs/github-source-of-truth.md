@@ -30,7 +30,7 @@ Hostinger should only run code that exists in GitHub at a known commit.
 Run:
 
 ```bash
-npm run check:source-of-truth
+pnpm run check:source-of-truth
 ```
 
 The check passes only when:
@@ -47,10 +47,10 @@ The production site is deployed by `.github/workflows/deploy-production.yml`.
 When a commit is pushed to `main`:
 
 1. GitHub Actions checks out the commit.
-2. GitHub Actions installs dependencies and builds the app.
+2. GitHub Actions installs pnpm dependencies and builds the app.
 3. If the build passes, GitHub Actions connects to the Hostinger VPS.
 4. The VPS checks out the exact pushed commit.
-5. The VPS installs dependencies, builds, and restarts the Docker container.
+5. The VPS installs pnpm dependencies, builds, and restarts the Docker container.
 
 Required GitHub environment secrets for `production`:
 

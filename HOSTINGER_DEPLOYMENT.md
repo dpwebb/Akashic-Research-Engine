@@ -24,6 +24,16 @@ port: 3500
 repo path on VPS: /opt/akashic-research-engine/app
 ```
 
+Runtime pattern:
+
+```text
+frontend: Vite + React + TypeScript
+server: Hono + TypeScript
+package manager: pnpm 10 via Corepack
+database: PostgreSQL planned
+proxy: Traefik with Let's Encrypt
+```
+
 ## DNS
 
 Point the domain to the Hostinger VPS:
@@ -51,10 +61,11 @@ sudo chown -R "$USER":"$USER" /opt/akashic-research-engine
 cd /opt/akashic-research-engine
 git clone https://github.com/dpwebb/Akashic-Research-Engine.git app
 cd app
-npm ci
-npm run typecheck
-npm run build
-npm run build:site
+corepack enable
+corepack prepare pnpm@10 --activate
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run build
 docker compose up -d --build akashic-research-engine
 ```
 
@@ -94,7 +105,7 @@ Add the public key to the VPS deploy user's `~/.ssh/authorized_keys`, then store
 Before manual deployments from this PC:
 
 ```bash
-npm run check:source-of-truth
+pnpm run check:source-of-truth
 ```
 
 On the VPS, basic service checks:
@@ -115,10 +126,20 @@ Manual equivalent on the VPS:
 cd /opt/akashic-research-engine/app
 git fetch --prune origin
 git checkout <known-github-commit-sha>
-npm ci
-npm run typecheck
-npm run build
-npm run build:site
+corepack enable
+corepack prepare pnpm@10 --activate
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run build
 docker rm -f akashic-research-engine 2>/dev/null || true
 docker compose up -d --build akashic-research-engine
 ```
+
+## Required Runtime Secrets
+
+The current build includes seeded local data and does not require secrets to start.
+
+Before live persistence or AI generation is enabled, configure:
+
+- `DATABASE_URL`
+- `OPENAI_API_KEY`

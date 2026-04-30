@@ -5,31 +5,42 @@ This repository is configured for deployment on **Hostinger VPS** with the custo
 - Domain: `akashicresearch.info`
 - Repository: `https://github.com/dpwebb/Akashic-Research-Engine.git`
 
+## Stack
+
+- Vite, React, and TypeScript for the research UI.
+- Hono and TypeScript for API routes and production serving.
+- PostgreSQL planned as the source/citation database.
+- Kysely types are included for the database access layer.
+- Docker, Traefik, and GitHub Actions match the Hostinger VPS management pattern used by the other apps.
+
 ## Included Configuration
 
 - GitHub Actions workflow at `.github/workflows/deploy-production.yml` deploys the exact GitHub commit to Hostinger VPS.
-- TypeScript app entry at `src/main.ts` compiles to `dist/main.js`.
-- `index.html` shell loads the compiled TypeScript output.
-- `scripts/build-site.mjs` creates the deployable `site/` artifact.
+- React app entry at `src/main.tsx`.
+- Hono production server at `server.ts`.
+- Shared research taxonomy and seeded dataset in `src/shared/`.
+- Database schema draft in `docs/database-schema.sql`.
 - `Dockerfile` and `docker-compose.yml` define the Hostinger Docker/Traefik service.
 
 ## Local Development
 
 1. Install dependencies:
    ```bash
-   npm install
+   corepack enable
+   corepack prepare pnpm@10 --activate
+   pnpm install
    ```
 2. Type-check:
    ```bash
-   npm run typecheck
+   pnpm run typecheck
    ```
-3. Build TypeScript:
+3. Build:
    ```bash
-   npm run build
+   pnpm run build
    ```
-4. Build the static site artifact:
+4. Run the production server locally after building:
    ```bash
-   npm run build:site
+   pnpm start
    ```
 
 ## Hostinger VPS Deployment
@@ -40,7 +51,7 @@ See `docs/github-source-of-truth.md` for the GitHub source-of-truth rules shared
 Before deploying from this PC:
 
 ```bash
-npm run check:source-of-truth
+pnpm run check:source-of-truth
 ```
 
 ## DNS Records
