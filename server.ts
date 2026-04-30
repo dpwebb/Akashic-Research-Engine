@@ -53,6 +53,8 @@ app.get('/api/claims', (c) => c.json(researchDataset.claims));
 
 app.get('/api/genealogy', (c) => c.json(researchDataset.genealogy));
 
+app.get('/api/research-index', (c) => c.json(researchDataset.index));
+
 app.get('/api/assistant/prompts', (c) => c.json(promptTemplates));
 
 app.get('/api/seed-packs', (c) => c.json(seedPacks));

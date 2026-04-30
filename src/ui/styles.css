@@ -622,6 +622,63 @@ td span {
   background: #eef3ea;
 }
 
+.index-toolbar {
+  max-width: 720px;
+}
+
+.index-toolbar label {
+  display: grid;
+  gap: 6px;
+  color: #425046;
+  font-weight: 800;
+}
+
+.index-toolbar input {
+  width: 100%;
+  border: 1px solid #bfcbc2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #17201b;
+  background: #fbfdf9;
+}
+
+.index-tabs button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.index-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(23 32 27 / 7%);
+}
+
+.index-card h2,
+.index-card p {
+  margin-bottom: 0;
+}
+
+.index-card a {
+  width: fit-content;
+  color: #204b39;
+  font-weight: 800;
+}
+
+.timeline-record {
+  max-width: 920px;
+}
+
 .framework-card svg {
   color: #8a4b24;
 }

@@ -112,3 +112,54 @@ export type ReviewQueueItem = {
   citationNotes: string;
   discoveredAt: string;
 };
+
+export type ResearchPerson = {
+  id: string;
+  name: string;
+  lifespan: string;
+  role: string;
+  movementIds: string[];
+  sourceIds: string[];
+  summary: string;
+};
+
+export type ResearchMovement = {
+  id: string;
+  name: string;
+  period: string;
+  classification: SourceClassification;
+  summary: string;
+  sourceIds: string[];
+};
+
+export type ResearchTerm = {
+  id: string;
+  term: string;
+  aliases: string[];
+  tradition: string;
+  definition: string;
+  caution: string;
+  sourceIds: string[];
+};
+
+export type TimelineEvent = {
+  id: string;
+  date: string;
+  title: string;
+  summary: string;
+  entityIds: string[];
+  sourceIds: string[];
+  confidenceLevel: 'high' | 'medium' | 'low';
+};
+
+export type BibliographicRecord = {
+  id: string;
+  sourceId: string;
+  title: string;
+  author: string;
+  publicationDate: string;
+  editionNotes: string;
+  archiveUrl: string;
+  rightsStatus: 'public domain' | 'copyrighted' | 'unknown';
+  citation: string;
+};
