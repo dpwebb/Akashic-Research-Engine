@@ -25,6 +25,8 @@ export function DiscoveryPage() {
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<SourceClassification[]>([]);
   const [selectedEvidenceGrades, setSelectedEvidenceGrades] = useState<EvidenceGrade[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [minRelevance, setMinRelevance] = useState(0);
   const [response, setResponse] = useState<DiscoverySearchResponse | null>(null);
   const [error, setError] = useState('');
@@ -44,6 +46,8 @@ export function DiscoveryPage() {
       sourceTypes: selectedSourceTypes,
       evidenceGrades: selectedEvidenceGrades,
       sourceIds: selectedSourceId === 'all' ? [] : [selectedSourceId],
+      dateFrom: dateFrom ? Number.parseInt(dateFrom, 10) : undefined,
+      dateTo: dateTo ? Number.parseInt(dateTo, 10) : undefined,
       minRelevance,
     }),
     [
@@ -58,6 +62,8 @@ export function DiscoveryPage() {
       selectedSourceTypes,
       selectedEvidenceGrades,
       selectedSourceId,
+      dateFrom,
+      dateTo,
       minRelevance,
     ],
   );
@@ -251,6 +257,24 @@ export function DiscoveryPage() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              Date from
+              <input
+                type="number"
+                value={dateFrom}
+                onChange={(event) => setDateFrom(event.target.value)}
+                placeholder="1880"
+              />
+            </label>
+            <label>
+              Date to
+              <input
+                type="number"
+                value={dateTo}
+                onChange={(event) => setDateTo(event.target.value)}
+                placeholder="1920"
+              />
             </label>
           </div>
 

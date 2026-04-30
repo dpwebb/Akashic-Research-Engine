@@ -143,6 +143,8 @@ const discoverySearchSchema = z.object({
   sourceTypes: z.array(z.enum(sourceClassifications)).max(8).default([]),
   evidenceGrades: z.array(z.enum(['A', 'B', 'C', 'D', 'E', 'F'])).max(6).default([]),
   sourceIds: z.array(z.string().min(1).max(120)).max(24).default([]),
+  dateFrom: z.number().int().min(-5000).max(3000).optional(),
+  dateTo: z.number().int().min(-5000).max(3000).optional(),
   minRelevance: z.number().int().min(0).max(100).default(0),
 });
 

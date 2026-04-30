@@ -18,19 +18,46 @@ function includesQuery(values: Array<string | string[]>, query: string): boolean
   return text.includes(query.toLocaleLowerCase());
 }
 
+function extractYears(text: string): number[] {
+  return [...text.matchAll(/\b(1[0-9]{3}|20[0-9]{2}|21[0-9]{2})\b/g)].map((match) =>
+    Number.parseInt(match[1], 10),
+  );
+}
+
+function matchesDateRange(text: string, dateFrom: string, dateTo: string): boolean {
+  if (!dateFrom && !dateTo) {
+    return true;
+  }
+
+  const years = extractYears(text);
+  if (years.length === 0) {
+    return false;
+  }
+
+  const from = dateFrom ? Number.parseInt(dateFrom, 10) : Number.NEGATIVE_INFINITY;
+  const to = dateTo ? Number.parseInt(dateTo, 10) : Number.POSITIVE_INFINITY;
+  return years.some((year) => year >= from && year <= to);
+}
+
 export function ResearchIndexPage() {
   const [activeTab, setActiveTab] = useState<IndexTab>('people');
   const [query, setQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const normalizedQuery = query.trim();
   const index = researchDataset.index;
 
   const filtered = useMemo(
     () => ({
-      people: index.people.filter((person) =>
-        includesQuery([person.name, person.lifespan, person.role, person.summary, person.movementIds], normalizedQuery),
+      people: index.people.filter(
+        (person) =>
+          includesQuery([person.name, person.lifespan, person.role, person.summary, person.movementIds], normalizedQuery) &&
+          matchesDateRange(person.lifespan, dateFrom, dateTo),
       ),
-      movements: index.movements.filter((movement) =>
-        includesQuery([movement.name, movement.period, movement.classification, movement.summary], normalizedQuery),
+      movements: index.movements.filter(
+        (movement) =>
+          includesQuery([movement.name, movement.period, movement.classification, movement.summary], normalizedQuery) &&
+          matchesDateRange(movement.period, dateFrom, dateTo),
       ),
       terms: index.terms.filter((term) =>
         includesQuery([term.term, term.aliases, term.tradition, term.definition, term.caution], normalizedQuery),
@@ -47,26 +74,29 @@ export function ResearchIndexPage() {
           normalizedQuery,
         ),
       ),
-      timeline: index.timeline.filter((event) =>
-        includesQuery([event.date, event.title, event.summary, event.entityIds], normalizedQuery),
+      timeline: index.timeline.filter(
+        (event) =>
+          includesQuery([event.date, event.title, event.summary, event.entityIds], normalizedQuery) &&
+          matchesDateRange(event.date, dateFrom, dateTo),
       ),
-      bibliography: index.bibliography.filter((record) =>
-        includesQuery(
-          [
-            record.title,
-            record.author,
-            record.publicationDate,
-            record.editionNotes,
-            record.publisher,
-            record.rightsStatus,
-            record.stableCitation,
-            record.pageReference,
-          ],
-          normalizedQuery,
-        ),
+      bibliography: index.bibliography.filter(
+        (record) =>
+          includesQuery(
+            [
+              record.title,
+              record.author,
+              record.publicationDate,
+              record.editionNotes,
+              record.publisher,
+              record.rightsStatus,
+              record.stableCitation,
+              record.pageReference,
+            ],
+            normalizedQuery,
+          ) && matchesDateRange(record.publicationDate, dateFrom, dateTo),
       ),
     }),
-    [index, normalizedQuery],
+    [dateFrom, dateTo, index, normalizedQuery],
   );
 
   return (
@@ -77,7 +107,7 @@ export function ResearchIndexPage() {
         <p>Browse the structured people, movements, terms, comparisons, timeline events, and bibliography behind the corpus.</p>
       </header>
 
-      <div className="index-toolbar">
+      <section className="filter-panel index-filter-panel">
         <label>
           Search index
           <input
@@ -86,7 +116,25 @@ export function ResearchIndexPage() {
             placeholder="Filter by person, movement, term, date, or source"
           />
         </label>
-      </div>
+        <label>
+          Date from
+          <input
+            type="number"
+            value={dateFrom}
+            onChange={(event) => setDateFrom(event.target.value)}
+            placeholder="1880"
+          />
+        </label>
+        <label>
+          Date to
+          <input
+            type="number"
+            value={dateTo}
+            onChange={(event) => setDateTo(event.target.value)}
+            placeholder="1920"
+          />
+        </label>
+      </section>
 
       <div className="scope-control index-tabs" aria-label="Research index sections">
         {tabs.map((tab) => {
@@ -169,7 +217,7 @@ export function ResearchIndexPage() {
               <span className="tag">{event.date}</span>
               <h2>{event.title}</h2>
               <p>{event.summary}</p>
-              <p className="muted">Confidence {event.confidenceLevel} · entities {event.entityIds.join(', ')}</p>
+              <p className="muted">Confidence {event.confidenceLevel} - entities {event.entityIds.join(', ')}</p>
             </article>
           ))}
         </div>
@@ -182,7 +230,7 @@ export function ResearchIndexPage() {
               <span className="tag">{record.rightsStatus}</span>
               <h2>{record.title}</h2>
               <p className="muted">
-                {record.author} · {record.publicationDate}
+                {record.author} - {record.publicationDate}
               </p>
               <p>{record.editionNotes}</p>
               <p className="muted">Publisher: {record.publisher}</p>

@@ -57,6 +57,8 @@ export type DiscoverySearchRequest = {
   sourceTypes?: SourceClassification[];
   evidenceGrades?: EvidenceGrade[];
   sourceIds?: string[];
+  dateFrom?: number;
+  dateTo?: number;
   minRelevance?: number;
 };
 

@@ -26,6 +26,8 @@ type NormalizedDiscoverySearchRequest = DiscoverySearchRequest & {
   domains: string[];
   evidenceGrades: Array<'A' | 'B' | 'C' | 'D' | 'E' | 'F'>;
   sourceIds: string[];
+  dateFrom?: number;
+  dateTo?: number;
   minRelevance: number;
 };
 
@@ -91,6 +93,8 @@ function normalizeRequest(request: DiscoverySearchRequest): NormalizedDiscoveryS
     sourceTypes: request.sourceTypes ?? [],
     evidenceGrades: request.evidenceGrades ?? [],
     sourceIds: request.sourceIds ?? [],
+    dateFrom: request.dateFrom,
+    dateTo: request.dateTo,
     exactPhrase: request.exactPhrase?.trim(),
     minRelevance: request.minRelevance ?? 0,
   };
@@ -684,6 +688,10 @@ function passesGranularFilters(
     return false;
   }
 
+  if ((request.dateFrom !== undefined || request.dateTo !== undefined) && !matchesDateRange(searchableText, request)) {
+    return false;
+  }
+
   if (request.includeTerms.some((term) => !searchableText.includes(term.toLocaleLowerCase()))) {
     return false;
   }
@@ -697,6 +705,23 @@ function passesGranularFilters(
   }
 
   return true;
+}
+
+function matchesDateRange(text: string, request: NormalizedDiscoverySearchRequest): boolean {
+  const years = extractYears(text);
+  if (years.length === 0) {
+    return false;
+  }
+
+  const from = request.dateFrom ?? Number.NEGATIVE_INFINITY;
+  const to = request.dateTo ?? Number.POSITIVE_INFINITY;
+  return years.some((year) => year >= from && year <= to);
+}
+
+function extractYears(text: string): number[] {
+  return [...text.matchAll(/\b(1[0-9]{3}|20[0-9]{2}|21[0-9]{2})\b/g)].map((match) =>
+    Number.parseInt(match[1], 10),
+  );
 }
 
 function tokenize(value: string): string[] {
