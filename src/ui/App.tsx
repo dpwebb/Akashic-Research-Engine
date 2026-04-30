@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
-import { Archive, Bot, GitFork, Home, Import, Inbox, Library, Radar, Scale, ScrollText, Sparkles } from 'lucide-react';
+import { Archive, Bot, CreditCard, GitFork, Home, Import, Inbox, Library, Radar, Scale, ScrollText, Sparkles } from 'lucide-react';
 import { Dashboard } from './pages/Dashboard.js';
 import { SourcesPage } from './pages/SourcesPage.js';
 import { ClaimsPage } from './pages/ClaimsPage.js';
@@ -10,6 +10,7 @@ import { DiscoveryPage } from './pages/DiscoveryPage.js';
 import { SeedQueuePage } from './pages/SeedQueuePage.js';
 import { ResearchIndexPage } from './pages/ResearchIndexPage.js';
 import { SourceImportPage } from './pages/SourceImportPage.js';
+import { BillingPage } from './pages/BillingPage.js';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home },
@@ -22,6 +23,7 @@ const navItems = [
   { to: '/seed-queue', label: 'Seed Queue', icon: Inbox },
   { to: '/assistant', label: 'Assistant', icon: Bot },
   { to: '/addition-builder', label: 'Builder', icon: Sparkles },
+  { to: '/billing', label: 'Memberships', icon: CreditCard },
 ];
 
 export function App() {
@@ -59,6 +61,7 @@ export function App() {
           <Route path="/seed-queue" element={<SeedQueuePage />} />
           <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/addition-builder" element={<AdditionBuilderPage />} />
+          <Route path="/billing" element={<BillingPage />} />
         </Routes>
       </main>
     </div>

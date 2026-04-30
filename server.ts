@@ -1,9 +1,10 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { logger } from 'hono/logger';
 import { z } from 'zod';
 import { getIntegrationStatus } from './src/server/integrations/status.js';
+import { BillingConfigurationError, createStripeCheckoutSession, getBillingPlanOverview } from './src/server/billing/stripeCheckout.js';
 import { generateResearchAssistantOutput } from './src/server/openai/researchAssistant.js';
 import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
 import { previewSourceImport } from './src/server/importing/sourceImport.js';
@@ -26,6 +27,7 @@ app.use('/api/*', logger());
 app.use('/api/source-import/preview', rateLimit('source-import-preview', { windowMs: 60_000, maxRequests: 12 }));
 app.use('/api/discovery/search', rateLimit('discovery-search', { windowMs: 60_000, maxRequests: 10 }));
 app.use('/api/assistant/generate', rateLimit('assistant-generate', { windowMs: 60_000, maxRequests: 6 }));
+app.use('/api/billing/checkout', rateLimit('billing-checkout', { windowMs: 60_000, maxRequests: 8 }));
 
 app.get('/api/health', (c) =>
   c.json({
@@ -36,6 +38,32 @@ app.get('/api/health', (c) =>
 );
 
 app.get('/api/integrations', (c) => c.json(getIntegrationStatus()));
+
+app.get('/api/billing/plans', (c) => c.json(getBillingPlanOverview()));
+
+const billingCheckoutSchema = z.object({
+  planId: z.string().min(1).max(80),
+  customerEmail: z.string().email().optional(),
+});
+
+app.post('/api/billing/checkout', async (c) => {
+  try {
+    const input = billingCheckoutSchema.parse(await c.req.json());
+    const checkoutSession = await createStripeCheckoutSession({
+      ...input,
+      origin: getApplicationOrigin(c),
+    });
+    return c.json(checkoutSession);
+  } catch (error) {
+    console.error('[Billing Checkout]', error);
+
+    if (error instanceof BillingConfigurationError) {
+      return c.json({ error: error.message }, 503);
+    }
+
+    return c.json({ error: error instanceof Error ? error.message : 'Checkout could not be started.' }, 400);
+  }
+});
 
 app.get('/api/taxonomy', (c) =>
   c.json({
@@ -308,6 +336,19 @@ function inferRequiredActions(sourceType: SourceClassification): string[] {
   }
 
   return ['Verify author, publisher, date, and stable URL', 'Record citation-ready page or section reference'];
+}
+
+function getApplicationOrigin(c: Context): string {
+  if (process.env.PUBLIC_APP_URL) {
+    return process.env.PUBLIC_APP_URL.replace(/\/$/, '');
+  }
+
+  const requestUrl = new URL(c.req.url);
+  const forwardedProto = c.req.header('x-forwarded-proto')?.split(',')[0]?.trim();
+  const forwardedHost = c.req.header('x-forwarded-host')?.split(',')[0]?.trim();
+  const protocol = forwardedProto || requestUrl.protocol.replace(':', '');
+  const host = forwardedHost || c.req.header('host') || requestUrl.host;
+  return `${protocol}://${host}`;
 }
 
 app.use('/_assets/*', serveStatic({ root: './dist' }));
