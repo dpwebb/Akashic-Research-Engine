@@ -254,6 +254,16 @@ export function DiscoveryPage() {
           )}
 
           <div className="source-list discovery-results">
+            {response.results.length === 0 && (
+              <div className="panel empty-results">
+                <h2>No Matches</h2>
+                <p>
+                  The search ran, but no results survived the active filters. Clear required terms,
+                  exact phrase, source classifications, or minimum relevance to broaden the search.
+                </p>
+              </div>
+            )}
+
             {response.results.map((result) => (
               <article className="source-card search-result-card" key={result.id}>
                 <div>

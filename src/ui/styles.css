@@ -530,6 +530,11 @@ td span {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.empty-results p {
+  margin-bottom: 0;
+  color: #425046;
+}
+
 .search-result-card {
   gap: 14px;
 }

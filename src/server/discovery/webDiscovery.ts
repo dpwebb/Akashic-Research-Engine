@@ -7,8 +7,9 @@ import type {
 import { researchDataset } from '../../shared/researchData.js';
 
 const searchEndpoint = 'https://html.duckduckgo.com/html/';
+const bingSearchEndpoint = 'https://www.bing.com/search';
 const userAgent =
-  'AkashicResearchEngine/1.0 (+https://github.com; research discovery; contact site owner for crawl concerns)';
+  'Mozilla/5.0 (compatible; AkashicResearchEngine/1.0; research discovery)';
 const requestTimeoutMs = 8000;
 const maxInspectableBytes = 500_000;
 
@@ -39,7 +40,12 @@ export async function discoverRelatedSources(
   let webResults: DiscoverySearchResult[] = [];
 
   if (normalizedRequest.scope !== 'engine') {
-    const rawResults = await searchDuckDuckGo(effectiveWebQuery, maxResults);
+    let rawResults = await searchPublicWeb(effectiveWebQuery, maxResults, warnings);
+    if (rawResults.length === 0 && effectiveWebQuery !== query) {
+      warnings.push('Strict web query returned no results; retried with the base research query.');
+      rawResults = await searchPublicWeb(query, maxResults, warnings);
+    }
+
     if (rawResults.length === 0) {
       warnings.push('No public search results were returned for this query.');
     }
@@ -49,11 +55,16 @@ export async function discoverRelatedSources(
       : rawResults.map((result, index) => toDiscoveryResult(result, normalizedRequest, index));
   }
 
-  const filteredResults = [...engineResults, ...webResults]
+  const candidateResults = [...engineResults, ...webResults];
+  const filteredResults = candidateResults
     .filter((result) => passesGranularFilters(result, normalizedRequest))
     .filter((result) => result.relevanceScore >= normalizedRequest.minRelevance)
     .sort((first, second) => second.relevanceScore - first.relevanceScore)
     .slice(0, maxResults);
+
+  if (candidateResults.length > 0 && filteredResults.length === 0) {
+    warnings.push('Search providers returned candidates, but the active filters removed all matches.');
+  }
 
   return {
     query,
@@ -189,6 +200,32 @@ function scoreSource(source: Source, request: NormalizedDiscoverySearchRequest):
   };
 }
 
+async function searchPublicWeb(
+  query: string,
+  maxResults: number,
+  warnings: string[],
+): Promise<RawSearchResult[]> {
+  const providerResults = await Promise.allSettled([
+    searchDuckDuckGo(query, maxResults),
+    searchBing(query, maxResults),
+  ]);
+  const results: RawSearchResult[] = [];
+
+  for (const providerResult of providerResults) {
+    if (providerResult.status === 'fulfilled') {
+      results.push(...providerResult.value);
+    } else {
+      warnings.push(
+        `A search provider failed: ${
+          providerResult.reason instanceof Error ? providerResult.reason.message : 'unknown error'
+        }`,
+      );
+    }
+  }
+
+  return dedupeResults(results).slice(0, maxResults);
+}
+
 async function searchDuckDuckGo(query: string, maxResults: number): Promise<RawSearchResult[]> {
   const body = new URLSearchParams({ q: query });
   const response = await fetchWithTimeout(searchEndpoint, {
@@ -205,7 +242,30 @@ async function searchDuckDuckGo(query: string, maxResults: number): Promise<RawS
   }
 
   const html = await response.text();
+  if (html.includes('anomaly.js') || html.includes('challenge-form')) {
+    return [];
+  }
+
   return parseDuckDuckGoResults(html).slice(0, maxResults);
+}
+
+async function searchBing(query: string, maxResults: number): Promise<RawSearchResult[]> {
+  const url = new URL(bingSearchEndpoint);
+  url.searchParams.set('q', query);
+
+  const response = await fetchWithTimeout(url.href, {
+    headers: {
+      Accept: 'text/html,application/xhtml+xml',
+      'User-Agent': userAgent,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Bing returned HTTP ${response.status}.`);
+  }
+
+  const html = await response.text();
+  return parseBingResults(html).slice(0, maxResults);
 }
 
 async function inspectResults(
@@ -287,6 +347,27 @@ function parseDuckDuckGoResults(html: string): RawSearchResult[] {
       title: cleanHtml(match[2]),
       url: normalizeDuckDuckGoUrl(decodeHtml(match[1])),
       snippet: '',
+    });
+  }
+
+  return dedupeResults(results);
+}
+
+function parseBingResults(html: string): RawSearchResult[] {
+  const results: RawSearchResult[] = [];
+  const resultPattern = /<li[^>]+class="b_algo"[\s\S]*?<h2[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:<p[^>]*>([\s\S]*?)<\/p>)?/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = resultPattern.exec(html)) !== null) {
+    const url = decodeHtml(match[1]);
+    if (!url.startsWith('http')) {
+      continue;
+    }
+
+    results.push({
+      title: cleanHtml(match[2]),
+      url,
+      snippet: cleanHtml(match[3] ?? ''),
     });
   }
 
