@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { researchDataset } from '../../shared/researchData.js';
 import { claimTypes, evidenceGrades, type ClaimType, type EvidenceGrade } from '../../shared/taxonomy.js';
 
 export function ClaimsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [claimType, setClaimType] = useState<'all' | ClaimType>('all');
   const [evidenceGrade, setEvidenceGrade] = useState<'all' | EvidenceGrade>('all');
-  const [sourceId, setSourceId] = useState('all');
   const [citationRequiredOnly, setCitationRequiredOnly] = useState(false);
+  const sourceId = searchParams.get('sourceId') ?? 'all';
+  const selectedSource = sourceId === 'all' ? undefined : researchDataset.sources.find((source) => source.id === sourceId);
+  const selectedSourceClaims = selectedSource
+    ? researchDataset.claims.filter((claim) => claim.sourceId === selectedSource.id)
+    : [];
 
   const filteredClaims = useMemo(
     () =>
@@ -42,6 +48,16 @@ export function ClaimsPage() {
     [citationRequiredOnly, claimType, evidenceGrade, query, sourceId],
   );
 
+  const setSourceFilter = (nextSourceId: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextSourceId === 'all') {
+      nextParams.delete('sourceId');
+    } else {
+      nextParams.set('sourceId', nextSourceId);
+    }
+    setSearchParams(nextParams);
+  };
+
   return (
     <section className="page-stack">
       <header className="page-header compact">
@@ -49,6 +65,27 @@ export function ClaimsPage() {
         <h1>Claims</h1>
         <p>Claims are labeled separately from the source summary and assigned an evidence grade.</p>
       </header>
+
+      {selectedSource && (
+        <section className="source-drilldown-panel">
+          <div>
+            <p className="eyebrow">Source drilldown</p>
+            <h2>{selectedSource.title}</h2>
+            <p className="muted">
+              {selectedSource.author} - {selectedSource.date} - {selectedSource.sourceType}
+            </p>
+            <p>{selectedSource.summary}</p>
+          </div>
+          <div className="source-drilldown-stats">
+            <span className="tag">{selectedSourceClaims.length} linked claims</span>
+            <span className="tag">{selectedSource.confidenceLevel} source confidence</span>
+            <Link to="/claims">Clear source</Link>
+            <a href={selectedSource.url} target="_blank" rel="noreferrer">
+              Open source
+            </a>
+          </div>
+        </section>
+      )}
 
       <section className="filter-panel claims-filter-panel">
         <label>
@@ -86,7 +123,7 @@ export function ClaimsPage() {
         </label>
         <label>
           Source
-          <select value={sourceId} onChange={(event) => setSourceId(event.target.value)}>
+          <select value={sourceId} onChange={(event) => setSourceFilter(event.target.value)}>
             <option value="all">All sources</option>
             {researchDataset.sources.map((source) => (
               <option key={source.id} value={source.id}>
@@ -125,7 +162,14 @@ export function ClaimsPage() {
                   <td>
                     <strong>{claim.text}</strong>
                     <span>{claim.notes}</span>
-                    {source && <span>Source: {source.title} - {source.author}</span>}
+                    {source && (
+                      <span>
+                        Source:{' '}
+                        <Link to={`/claims?sourceId=${encodeURIComponent(source.id)}`}>
+                          {source.title} - {source.author}
+                        </Link>
+                      </span>
+                    )}
                   </td>
                   <td>{claim.type}</td>
                   <td>

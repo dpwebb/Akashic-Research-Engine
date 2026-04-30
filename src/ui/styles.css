@@ -690,6 +690,20 @@ td span {
   font-size: 0.92rem;
 }
 
+.derived-claims-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.derived-claims-header a,
+.source-drilldown-stats a {
+  color: #0b5c44;
+  font-weight: 900;
+}
+
 .derived-claims ul {
   display: grid;
   gap: 8px;
@@ -714,6 +728,39 @@ td span {
   color: #ffffff;
   background: #173629;
   font-size: 0.82rem;
+}
+
+.derived-claims li span {
+  display: grid;
+  gap: 4px;
+}
+
+.derived-claims li small {
+  color: #6b3f23;
+  font-weight: 800;
+}
+
+.source-drilldown-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 260px);
+  gap: 16px;
+  max-width: 1120px;
+  padding: 16px;
+  border: 1px solid #bfd2c5;
+  border-radius: 8px;
+  background: #f5fbf6;
+}
+
+.source-drilldown-panel h2,
+.source-drilldown-panel p {
+  margin-bottom: 0;
+}
+
+.source-drilldown-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
 }
 
 .seed-pack-grid {
@@ -881,6 +928,7 @@ td span {
   .search-summary,
   .filter-panel,
   .claims-filter-panel,
+  .source-drilldown-panel,
   .distribution-row {
     grid-template-columns: 1fr;
   }

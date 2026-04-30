@@ -1,5 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { researchDataset } from '../../shared/researchData.js';
 import { sourceClassifications, type SourceClassification } from '../../shared/taxonomy.js';
 
@@ -116,12 +117,21 @@ export function SourcesPage() {
               <p className="notes">{source.citationNotes}</p>
               {sourceClaims.length > 0 && (
                 <div className="derived-claims">
-                  <h3>Claims Derived From This Source</h3>
+                  <div className="derived-claims-header">
+                    <h3>Claims Derived From This Source</h3>
+                    <Link to={`/claims?sourceId=${encodeURIComponent(source.id)}`}>Open drilldown</Link>
+                  </div>
                   <ul>
                     {sourceClaims.map((claim) => (
                       <li key={claim.id}>
                         <strong>{claim.evidenceGrade}</strong>
-                        <span>{claim.text}</span>
+                        <span>
+                          {claim.text}
+                          <small>
+                            {claim.type} - {claim.confidenceLevel} confidence - citation{' '}
+                            {claim.citationRequired ? 'required' : 'optional'}
+                          </small>
+                        </span>
                       </li>
                     ))}
                   </ul>
