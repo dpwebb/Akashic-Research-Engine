@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Check, CreditCard, Loader2, ShieldCheck } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { monetizationPlans, type MonetizationPlan } from '../../shared/monetization.js';
+import { monetizationPlans, usageMetricLabels, type MonetizationPlan } from '../../shared/monetization.js';
+import type { AccountEntitlement, AccountPlanId, UsageMetric } from '../../shared/types.js';
 
 type BillingOverview = {
   stripeConfigured: boolean;
@@ -16,6 +17,7 @@ export function BillingPage() {
   });
   const [customerEmail, setCustomerEmail] = useState('');
   const [activePlanId, setActivePlanId] = useState('');
+  const [entitlement, setEntitlement] = useState<AccountEntitlement | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -75,6 +77,44 @@ export function BillingPage() {
     }
   }
 
+  async function loadEntitlement(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`/api/account/entitlement?email=${encodeURIComponent(customerEmail.trim())}`);
+      if (!response.ok) {
+        throw new Error('Entitlement could not be loaded.');
+      }
+      setEntitlement(await response.json());
+    } catch (entitlementError) {
+      setError(entitlementError instanceof Error ? entitlementError.message : 'Entitlement could not be loaded.');
+    }
+  }
+
+  async function activateEntitlement(planId: AccountPlanId) {
+    if (!customerEmail.trim()) {
+      setError('Enter an account email before assigning access.');
+      return;
+    }
+
+    const response = await fetch('/api/account/entitlement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: customerEmail.trim(), planId, status: 'active' }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError(data.error ?? 'Entitlement could not be updated.');
+      return;
+    }
+
+    setEntitlement(data);
+    setMessage('Account entitlement updated.');
+  }
+
   return (
     <section className="page-stack">
       <header className="page-header compact">
@@ -99,9 +139,9 @@ export function BillingPage() {
       {message && <p className="form-success">{message}</p>}
       {error && <p className="form-error">{error}</p>}
 
-      <section className="billing-email-panel">
+      <form className="billing-email-panel" onSubmit={loadEntitlement}>
         <label>
-          Checkout email
+          Account email
           <input
             type="email"
             value={customerEmail}
@@ -109,7 +149,25 @@ export function BillingPage() {
             placeholder="researcher@example.com"
           />
         </label>
-      </section>
+        <button type="submit">Check Access</button>
+      </form>
+
+      {entitlement && (
+        <section className="panel entitlement-panel">
+          <h2>Current Access</h2>
+          <p>
+            {entitlement.email} - {entitlement.planId} - {entitlement.status}
+          </p>
+          <div className="health-grid">
+            {(Object.entries(entitlement.usage) as Array<[UsageMetric, number]>).map(([metric, value]) => (
+              <article className="health-stat" key={metric}>
+                <span>{usageMetricLabels[metric]}</span>
+                <strong>{value}</strong>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="pricing-grid">
         {overview.plans.map((plan) => {
@@ -126,6 +184,14 @@ export function BillingPage() {
               </div>
               <p>{plan.description}</p>
               <ul>
+                {(Object.entries(plan.usageLimits) as Array<[UsageMetric, number | null]>).map(([metric, limit]) => (
+                  <li key={metric}>
+                    <Check aria-hidden="true" />
+                    <span>
+                      {usageMetricLabels[metric]}: {limit === null ? 'Unlimited' : limit.toLocaleString()}
+                    </span>
+                  </li>
+                ))}
                 {plan.features.map((feature) => (
                   <li key={feature}>
                     <Check aria-hidden="true" />
@@ -144,6 +210,9 @@ export function BillingPage() {
                       : 'Checkout Pending'}
                 </button>
               </form>
+              <button type="button" onClick={() => activateEntitlement(plan.id)}>
+                Assign Access
+              </button>
             </article>
           );
         })}

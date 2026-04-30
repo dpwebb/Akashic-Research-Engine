@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
-import { Archive, Bot, CreditCard, GitFork, Home, Import, Inbox, Library, Radar, Scale, ScrollText, Sparkles } from 'lucide-react';
+import { Archive, Bot, BriefcaseBusiness, CreditCard, Download, GitFork, Home, Import, Inbox, Library, Radar, Scale, ScrollText, Sparkles } from 'lucide-react';
 import { Dashboard } from './pages/Dashboard.js';
 import { SourcesPage } from './pages/SourcesPage.js';
 import { ClaimsPage } from './pages/ClaimsPage.js';
@@ -11,9 +11,12 @@ import { SeedQueuePage } from './pages/SeedQueuePage.js';
 import { ResearchIndexPage } from './pages/ResearchIndexPage.js';
 import { SourceImportPage } from './pages/SourceImportPage.js';
 import { BillingPage } from './pages/BillingPage.js';
+import { OperationsPage } from './pages/OperationsPage.js';
+import { ExportsPage } from './pages/ExportsPage.js';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home },
+  { to: '/operations', label: 'Operations', icon: BriefcaseBusiness },
   { to: '/research-index', label: 'Index', icon: ScrollText },
   { to: '/sources', label: 'Sources', icon: Library },
   { to: '/claims', label: 'Claims', icon: Scale },
@@ -23,6 +26,7 @@ const navItems = [
   { to: '/seed-queue', label: 'Seed Queue', icon: Inbox },
   { to: '/assistant', label: 'Assistant', icon: Bot },
   { to: '/addition-builder', label: 'Builder', icon: Sparkles },
+  { to: '/exports', label: 'Exports', icon: Download },
   { to: '/billing', label: 'Memberships', icon: CreditCard },
 ];
 
@@ -52,6 +56,7 @@ export function App() {
       <main className="content">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/operations" element={<OperationsPage />} />
           <Route path="/research-index" element={<ResearchIndexPage />} />
           <Route path="/sources" element={<SourcesPage />} />
           <Route path="/claims" element={<ClaimsPage />} />
@@ -61,6 +66,7 @@ export function App() {
           <Route path="/seed-queue" element={<SeedQueuePage />} />
           <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/addition-builder" element={<AdditionBuilderPage />} />
+          <Route path="/exports" element={<ExportsPage />} />
           <Route path="/billing" element={<BillingPage />} />
         </Routes>
       </main>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, ExternalLink, X } from 'lucide-react';
+import { Check, ExternalLink, Rocket, X } from 'lucide-react';
 import { sourceClassifications, type SourceClassification } from '../../shared/taxonomy.js';
 import type { ReviewQueueItem, SeedPack } from '../../shared/types.js';
 
@@ -55,8 +55,24 @@ export function SeedQueuePage() {
     setQueueItems((current) => current.map((item) => (item.id === updatedItem.id ? updatedItem : item)));
   }
 
+  async function promoteItem(id: string) {
+    const response = await fetch(`/api/review-queue/${id}/promote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promotionNotes: 'Promoted from Seed Queue review workflow.' }),
+    });
+
+    if (!response.ok) {
+      setError('Review item could not be promoted.');
+      return;
+    }
+
+    await loadSeedData();
+  }
+
   const pendingCount = queueItems.filter((item) => item.status === 'pending').length;
   const approvedCount = queueItems.filter((item) => item.status === 'approved').length;
+  const promotedCount = queueItems.filter((item) => item.status === 'promoted').length;
   const filteredQueueItems = queueItems.filter((item) => {
     const searchableText = [
       item.title,
@@ -117,6 +133,10 @@ export function SeedQueuePage() {
           <span>Approved</span>
           <strong>{approvedCount}</strong>
         </article>
+        <article>
+          <span>Promoted</span>
+          <strong>{promotedCount}</strong>
+        </article>
       </div>
 
       <section className="panel">
@@ -151,7 +171,9 @@ export function SeedQueuePage() {
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
             <option value="all">All status</option>
             <option value="pending">Pending</option>
+            <option value="reviewed">Reviewed</option>
             <option value="approved">Approved</option>
+            <option value="promoted">Promoted</option>
             <option value="rejected">Rejected</option>
           </select>
         </label>
@@ -245,10 +267,23 @@ export function SeedQueuePage() {
               </div>
             )}
             {item.reviewerNotes && <p className="muted">Reviewer notes: {item.reviewerNotes}</p>}
+            {item.decisionReason && <p className="muted">Decision: {item.decisionReason}</p>}
             <div className="review-actions">
+              <button type="button" onClick={() => updateStatus(item.id, 'reviewed')}>
+                <Check aria-hidden="true" />
+                Mark Reviewed
+              </button>
               <button type="button" onClick={() => updateStatus(item.id, 'approved')}>
                 <Check aria-hidden="true" />
                 Approve
+              </button>
+              <button
+                type="button"
+                onClick={() => promoteItem(item.id)}
+                disabled={item.status !== 'reviewed' && item.status !== 'approved' && item.status !== 'promoted'}
+              >
+                <Rocket aria-hidden="true" />
+                Promote
               </button>
               <button type="button" onClick={() => updateStatus(item.id, 'rejected')}>
                 <X aria-hidden="true" />

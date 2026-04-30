@@ -1099,6 +1099,18 @@ td span {
   background: #fbfdf9;
 }
 
+.billing-email-panel button,
+.pricing-card > button {
+  width: fit-content;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #173629;
+  background: #eef3ea;
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .pricing-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -1189,6 +1201,65 @@ td span {
   font-weight: 900;
 }
 
+.ops-grid,
+.export-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.ops-status-line {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  overflow-wrap: anywhere;
+  color: #425046;
+  font-weight: 800;
+}
+
+.export-form {
+  grid-template-columns: minmax(220px, 1fr) minmax(200px, 1fr) minmax(220px, 1fr) auto;
+  align-items: end;
+  max-width: 1120px;
+}
+
+.export-row {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  padding: 12px;
+  color: #17201b;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-row.active,
+.export-row:hover {
+  border-color: #c79b3f;
+  background: #fbf7ec;
+}
+
+.export-row span {
+  font-weight: 900;
+}
+
+.export-row small {
+  color: #5e6b62;
+}
+
+.export-preview {
+  max-width: none;
+  align-self: start;
+}
+
+.entitlement-panel {
+  max-width: 860px;
+}
+
 @media (max-width: 840px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1217,6 +1288,9 @@ td span {
   .claims-filter-panel,
   .genealogy-filter-panel,
   .source-drilldown-panel,
+  .ops-grid,
+  .export-layout,
+  .export-form,
   .distribution-row {
     grid-template-columns: 1fr;
   }

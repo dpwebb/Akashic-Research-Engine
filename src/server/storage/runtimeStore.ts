@@ -1,12 +1,23 @@
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { IngestionJob, ReviewQueueItem } from '../../shared/types.js';
+import postgres from 'postgres';
+import type {
+  AccountEntitlement,
+  ExportDeliverable,
+  IngestionJob,
+  PromotedSource,
+  ReviewQueueItem,
+  RuntimePersistenceMode,
+} from '../../shared/types.js';
 import { seedReviewQueue } from '../../shared/seedData.js';
 import { createSourceFingerprint, normalizeSourceUrl } from '../deduplication/sourceDuplicates.js';
 
-type RuntimeState = {
+export type RuntimeState = {
   reviewQueue: ReviewQueueItem[];
   ingestionJobs: IngestionJob[];
+  promotedSources: PromotedSource[];
+  accountEntitlements: AccountEntitlement[];
+  exportDeliverables: ExportDeliverable[];
 };
 
 const runtimeStatePath = process.env.RUNTIME_STATE_PATH ?? join(process.cwd(), 'runtime-data', 'state.json');
@@ -22,6 +33,8 @@ let writeChain = Promise.resolve();
 let backupChain = Promise.resolve();
 let backupDirty = false;
 let backupTimer: NodeJS.Timeout | null = null;
+let persistenceMode: RuntimePersistenceMode = 'json';
+let sqlClient: postgres.Sql | null = null;
 
 export type RuntimeBackupStatus = {
   backupDirectory: string;
@@ -36,16 +49,16 @@ export async function loadRuntimeState(): Promise<RuntimeState> {
   }
 
   try {
+    state = await loadStateFromPostgres();
+    if (state) {
+      persistenceMode = 'postgres';
+      return state;
+    }
+
     const rawState = JSON.parse(await readFile(runtimeStatePath, 'utf8')) as Partial<RuntimeState>;
-    state = {
-      reviewQueue: normalizeReviewQueueItems(Array.isArray(rawState.reviewQueue) ? rawState.reviewQueue : seedReviewQueue),
-      ingestionJobs: normalizeIngestionJobs(Array.isArray(rawState.ingestionJobs) ? rawState.ingestionJobs : []),
-    };
+    state = normalizeRuntimeState(rawState);
   } catch {
-    state = {
-      reviewQueue: normalizeReviewQueueItems(seedReviewQueue),
-      ingestionJobs: [],
-    };
+    state = normalizeRuntimeState({});
     await persistRuntimeState();
   }
 
@@ -60,6 +73,12 @@ export async function persistRuntimeState(): Promise<void> {
   writeChain = writeChain
     .catch(() => undefined)
     .then(async () => {
+      if (persistenceMode === 'postgres') {
+        await persistStateToPostgres();
+        backupDirty = true;
+        return;
+      }
+
       await mkdir(dirname(runtimeStatePath), { recursive: true });
       const temporaryPath = `${runtimeStatePath}.tmp`;
       await writeFile(temporaryPath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
@@ -118,12 +137,17 @@ export async function getRuntimeBackupStatus(): Promise<RuntimeBackupStatus> {
   };
 }
 
+export function getRuntimePersistenceMode(): RuntimePersistenceMode {
+  return persistenceMode;
+}
+
 function normalizeReviewQueueItems(items: ReviewQueueItem[]): ReviewQueueItem[] {
   return items.map((item) => {
     try {
       const canonicalUrl = item.canonicalUrl ?? normalizeSourceUrl(item.url);
       return {
         ...item,
+        status: item.status === 'approved' && item.promotedAt ? 'promoted' : item.status,
         canonicalUrl,
         sourceFingerprint:
           item.sourceFingerprint ??
@@ -164,6 +188,64 @@ async function writeAtomically(path: string, content: string): Promise<void> {
   const temporaryPath = `${path}.tmp`;
   await writeFile(temporaryPath, content, 'utf8');
   await rename(temporaryPath, path);
+}
+
+function normalizeRuntimeState(rawState: Partial<RuntimeState>): RuntimeState {
+  return {
+    reviewQueue: normalizeReviewQueueItems(Array.isArray(rawState.reviewQueue) ? rawState.reviewQueue : seedReviewQueue),
+    ingestionJobs: normalizeIngestionJobs(Array.isArray(rawState.ingestionJobs) ? rawState.ingestionJobs : []),
+    promotedSources: Array.isArray(rawState.promotedSources) ? rawState.promotedSources : [],
+    accountEntitlements: Array.isArray(rawState.accountEntitlements) ? rawState.accountEntitlements : [],
+    exportDeliverables: Array.isArray(rawState.exportDeliverables) ? rawState.exportDeliverables : [],
+  };
+}
+
+async function loadStateFromPostgres(): Promise<RuntimeState | null> {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return null;
+  }
+
+  try {
+    const sql = getSqlClient(databaseUrl);
+    await sql`
+      create table if not exists app_runtime_state (
+        id text primary key,
+        state jsonb not null,
+        updated_at timestamptz not null default now()
+      )
+    `;
+    const rows = await sql<{ state: Partial<RuntimeState> }[]>`
+      select state from app_runtime_state where id = 'primary' limit 1
+    `;
+
+    if (rows.length === 0) {
+      return normalizeRuntimeState({});
+    }
+
+    return normalizeRuntimeState(rows[0].state);
+  } catch (error) {
+    console.error('[Runtime Store] PostgreSQL unavailable, falling back to JSON state.', error);
+    return null;
+  }
+}
+
+async function persistStateToPostgres(): Promise<void> {
+  if (!state || !process.env.DATABASE_URL) {
+    return;
+  }
+
+  const sql = getSqlClient(process.env.DATABASE_URL);
+  await sql`
+    insert into app_runtime_state (id, state, updated_at)
+    values ('primary', ${sql.json(state)}, now())
+    on conflict (id) do update set state = excluded.state, updated_at = now()
+  `;
+}
+
+function getSqlClient(databaseUrl: string): postgres.Sql {
+  sqlClient ??= postgres(databaseUrl, { max: 1 });
+  return sqlClient;
 }
 
 async function getLatestBackupTimestamp(): Promise<string | undefined> {

@@ -130,7 +130,7 @@ export type ReviewQueueItem = {
   proposedSourceType: SourceClassification;
   summary: string;
   provenance: 'curated seed' | 'discovery search';
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'reviewed' | 'approved' | 'promoted' | 'rejected';
   confidenceLevel: 'high' | 'medium' | 'low';
   reviewPriority: 'high' | 'medium' | 'low';
   citationNotes: string;
@@ -140,6 +140,54 @@ export type ReviewQueueItem = {
   duplicateCandidates?: DuplicateCandidate[];
   reviewedAt?: string;
   reviewerNotes?: string;
+  assignedReviewer?: string;
+  decisionReason?: string;
+  promotedAt?: string;
+  promotedSourceId?: string;
+};
+
+export type RuntimePersistenceMode = 'postgres' | 'json';
+
+export type AccountPlanId = 'public-library' | 'researcher-seat' | 'studio-seat' | 'institution-license';
+
+export type UsageMetric = 'discoverySearches' | 'sourceImports' | 'assistantGenerations' | 'reviewSubmissions' | 'exports';
+
+export type UsageLimits = Record<UsageMetric, number | null>;
+
+export type UsageSnapshot = Record<UsageMetric, number>;
+
+export type AccountEntitlement = {
+  email: string;
+  planId: AccountPlanId;
+  status: 'anonymous' | 'active' | 'trialing' | 'past_due' | 'cancelled';
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  currentPeriodEndsAt?: string;
+  usage: UsageSnapshot;
+  updatedAt: string;
+};
+
+export type ExportDeliverableType =
+  | 'citation-packet'
+  | 'contradiction-report'
+  | 'source-review-dossier'
+  | 'genealogy-summary'
+  | 'bibliography-export';
+
+export type ExportDeliverable = {
+  id: string;
+  type: ExportDeliverableType;
+  title: string;
+  format: 'markdown';
+  content: string;
+  createdAt: string;
+  createdByEmail?: string;
+};
+
+export type PromotedSource = Source & {
+  reviewQueueItemId: string;
+  promotedAt: string;
+  promotionNotes: string;
 };
 
 export type ResearchPerson = {

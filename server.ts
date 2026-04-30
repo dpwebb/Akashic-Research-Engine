@@ -16,6 +16,7 @@ import {
 } from './src/server/deduplication/sourceDuplicates.js';
 import { rateLimit } from './src/server/security/rateLimit.js';
 import {
+  getRuntimePersistenceMode,
   getRuntimeBackupStatus,
   loadRuntimeState,
   persistRuntimeState,
@@ -25,7 +26,17 @@ import { researchDataset } from './src/shared/researchData.js';
 import { seedPacks } from './src/shared/seedData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications, type SourceClassification } from './src/shared/taxonomy.js';
 import { promptTemplates } from './src/shared/promptTemplates.js';
-import type { IngestionJob, ReviewQueueItem } from './src/shared/types.js';
+import { monetizationPlans } from './src/shared/monetization.js';
+import type {
+  AccountEntitlement,
+  AccountPlanId,
+  ExportDeliverable,
+  ExportDeliverableType,
+  IngestionJob,
+  PromotedSource,
+  ReviewQueueItem,
+  UsageMetric,
+} from './src/shared/types.js';
 
 const port = Number.parseInt(process.env.PORT ?? '3500', 10);
 const host = process.env.HOST ?? '0.0.0.0';
@@ -33,6 +44,9 @@ const app = new Hono();
 const runtimeState = await loadRuntimeState();
 const reviewQueue = runtimeState.reviewQueue;
 const ingestionJobs = runtimeState.ingestionJobs;
+const promotedSources = runtimeState.promotedSources;
+const accountEntitlements = runtimeState.accountEntitlements;
+const exportDeliverables = runtimeState.exportDeliverables;
 startRuntimeStateBackups();
 
 app.use('/api/*', logger());
@@ -46,10 +60,44 @@ app.get('/api/health', (c) =>
     ok: true,
     service: 'akashic-research-engine',
     mode: process.env.NODE_ENV ?? 'development',
+    persistenceMode: getRuntimePersistenceMode(),
   }),
 );
 
 app.get('/api/integrations', (c) => c.json(getIntegrationStatus()));
+
+app.get('/api/operations/command-center', async (c) =>
+  c.json({
+    persistenceMode: getRuntimePersistenceMode(),
+    backup: await getRuntimeBackupStatus(),
+    reviewQueue: getReviewOperationsSummary(),
+    ingestionJobs: getIngestionOperationsSummary(),
+    promotedSources: {
+      total: promotedSources.length,
+      latest: promotedSources.slice(0, 5),
+    },
+    revenue: getRevenueOperationsSummary(),
+    actionItems: getOperationsActionItems(),
+  }),
+);
+
+app.get('/api/account/entitlement', (c) => {
+  const email = c.req.query('email')?.trim().toLocaleLowerCase();
+  return c.json(getEntitlement(email));
+});
+
+const entitlementSchema = z.object({
+  email: z.string().email(),
+  planId: z.enum(['public-library', 'researcher-seat', 'studio-seat', 'institution-license']),
+  status: z.enum(['anonymous', 'active', 'trialing', 'past_due', 'cancelled']).default('active'),
+});
+
+app.post('/api/account/entitlement', async (c) => {
+  const input = entitlementSchema.parse(await c.req.json());
+  const entitlement = upsertEntitlement(input.email, input.planId, input.status);
+  await persistRuntimeState();
+  return c.json(entitlement);
+});
 
 app.get('/api/billing/plans', (c) => c.json(getBillingPlanOverview()));
 
@@ -113,7 +161,9 @@ app.get('/api/runtime-summary', async (c) =>
     reviewQueue: {
       total: reviewQueue.length,
       pending: reviewQueue.filter((item) => item.status === 'pending').length,
+      reviewed: reviewQueue.filter((item) => item.status === 'reviewed').length,
       approved: reviewQueue.filter((item) => item.status === 'approved').length,
+      promoted: reviewQueue.filter((item) => item.status === 'promoted').length,
       rejected: reviewQueue.filter((item) => item.status === 'rejected').length,
       highPriority: reviewQueue.filter((item) => item.reviewPriority === 'high').length,
       mediumPriority: reviewQueue.filter((item) => item.reviewPriority === 'medium').length,
@@ -126,6 +176,7 @@ app.get('/api/runtime-summary', async (c) =>
       completed: ingestionJobs.filter((job) => job.status === 'completed').length,
       failed: ingestionJobs.filter((job) => job.status === 'failed').length,
     },
+    promotedSources: promotedSources.length,
     backups: await getRuntimeBackupStatus(),
   }),
 );
@@ -142,6 +193,7 @@ const reviewQueueItemSchema = z.object({
   qualityFlags: z.array(z.string().min(1).max(160)).max(12).optional(),
   requiredActions: z.array(z.string().min(1).max(220)).max(12).optional(),
   reviewerNotes: z.string().max(1200).optional(),
+  assignedReviewer: z.string().max(120).optional(),
 });
 
 app.post('/api/review-queue', async (c) => {
@@ -195,6 +247,7 @@ app.post('/api/review-queue', async (c) => {
     };
 
     reviewQueue.unshift(item);
+    incrementUsage(c, 'reviewSubmissions');
     await persistRuntimeState();
     return c.json(item, 201);
   } catch (error) {
@@ -211,15 +264,68 @@ app.patch('/api/review-queue/:id/status', async (c) => {
 
   const input = z
     .object({
-      status: z.enum(['pending', 'approved', 'rejected']),
+      status: z.enum(['pending', 'reviewed', 'approved', 'promoted', 'rejected']),
       reviewerNotes: z.string().max(1200).optional(),
+      assignedReviewer: z.string().max(120).optional(),
+      decisionReason: z.string().max(1200).optional(),
     })
     .parse(await c.req.json());
   item.status = input.status;
   item.reviewedAt = new Date().toISOString();
   item.reviewerNotes = input.reviewerNotes ?? item.reviewerNotes;
+  item.assignedReviewer = input.assignedReviewer ?? item.assignedReviewer;
+  item.decisionReason = input.decisionReason ?? item.decisionReason;
   await persistRuntimeState();
   return c.json(item);
+});
+
+const promotionSchema = z.object({
+  promotionNotes: z.string().max(1200).default('Promoted from reviewed source queue.'),
+});
+
+app.post('/api/review-queue/:id/promote', async (c) => {
+  const item = reviewQueue.find((entry) => entry.id === c.req.param('id'));
+  if (!item) {
+    return c.json({ error: 'Review item not found' }, 404);
+  }
+
+  if (item.status !== 'approved' && item.status !== 'reviewed' && item.status !== 'promoted') {
+    return c.json({ error: 'Only reviewed or approved items can be promoted.' }, 400);
+  }
+
+  const input = promotionSchema.parse(await c.req.json().catch(() => ({})));
+  const existing = promotedSources.find((source) => source.reviewQueueItemId === item.id);
+  if (existing) {
+    item.status = 'promoted';
+    item.promotedAt = existing.promotedAt;
+    item.promotedSourceId = existing.id;
+    await persistRuntimeState();
+    return c.json(existing);
+  }
+
+  const promotedSource: PromotedSource = {
+    id: `promoted-${Date.now()}-${slugify(item.title)}`,
+    title: item.title,
+    author: 'Pending review',
+    date: item.discoveredAt.slice(0, 10),
+    url: item.url,
+    canonicalUrl: item.canonicalUrl,
+    sourceFingerprint: item.sourceFingerprint,
+    sourceType: item.proposedSourceType,
+    summary: item.summary,
+    confidenceLevel: item.confidenceLevel,
+    citationNotes: item.citationNotes,
+    reviewQueueItemId: item.id,
+    promotedAt: new Date().toISOString(),
+    promotionNotes: input.promotionNotes,
+  };
+
+  promotedSources.unshift(promotedSource);
+  item.status = 'promoted';
+  item.promotedAt = promotedSource.promotedAt;
+  item.promotedSourceId = promotedSource.id;
+  await persistRuntimeState();
+  return c.json(promotedSource, 201);
 });
 
 const sourceImportPreviewSchema = z.object({
@@ -229,7 +335,10 @@ const sourceImportPreviewSchema = z.object({
 app.post('/api/source-import/preview', async (c) => {
   try {
     const input = sourceImportPreviewSchema.parse(await c.req.json());
+    assertUsageAllowed(c, 'sourceImports');
     const preview = await previewSourceImport(input.url);
+    incrementUsage(c, 'sourceImports');
+    await persistRuntimeState();
     return c.json(preview);
   } catch (error) {
     console.error('[Source Import Preview]', error);
@@ -319,7 +428,10 @@ const discoverySearchSchema = z.object({
 app.post('/api/discovery/search', async (c) => {
   try {
     const input = discoverySearchSchema.parse(await c.req.json());
+    assertUsageAllowed(c, 'discoverySearches');
     const output = await discoverRelatedSources(input);
+    incrementUsage(c, 'discoverySearches');
+    await persistRuntimeState();
     return c.json(output);
   } catch (error) {
     console.error('[Discovery Search]', error);
@@ -343,7 +455,10 @@ const assistantRequestSchema = z.object({
 app.post('/api/assistant/generate', async (c) => {
   try {
     const input = assistantRequestSchema.parse(await c.req.json());
+    assertUsageAllowed(c, 'assistantGenerations');
     const output = await generateResearchAssistantOutput(input);
+    incrementUsage(c, 'assistantGenerations');
+    await persistRuntimeState();
     return c.json(output);
   } catch (error) {
     console.error('[Assistant Generate]', error);
@@ -359,7 +474,291 @@ app.post('/api/assistant/generate', async (c) => {
   }
 });
 
+app.get('/api/exports', (c) => c.json(exportDeliverables));
+
+const exportSchema = z.object({
+  type: z.enum([
+    'citation-packet',
+    'contradiction-report',
+    'source-review-dossier',
+    'genealogy-summary',
+    'bibliography-export',
+  ]),
+  title: z.string().min(2).max(180).optional(),
+  createdByEmail: z.string().email().optional(),
+});
+
+app.post('/api/exports', async (c) => {
+  try {
+    const input = exportSchema.parse(await c.req.json());
+    assertUsageAllowed(c, 'exports', input.createdByEmail);
+    const deliverable = createExportDeliverable(input.type, input.title, input.createdByEmail);
+    exportDeliverables.unshift(deliverable);
+    incrementUsage(c, 'exports', input.createdByEmail);
+    await persistRuntimeState();
+    return c.json(deliverable, 201);
+  } catch (error) {
+    console.error('[Export Create]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Export could not be generated.' }, 400);
+  }
+});
+
 app.get('/api/addition-builder/frameworks', (c) => c.json(researchDataset.additionFrameworks));
+
+function getReviewOperationsSummary() {
+  const now = Date.now();
+  const dayMs = 86_400_000;
+  const pending = reviewQueue.filter((item) => item.status === 'pending');
+  const reviewed = reviewQueue.filter((item) => item.status === 'reviewed');
+  const approved = reviewQueue.filter((item) => item.status === 'approved');
+  const promoted = reviewQueue.filter((item) => item.status === 'promoted');
+  const stalePending = pending.filter((item) => now - new Date(item.discoveredAt).getTime() > 7 * dayMs);
+
+  return {
+    total: reviewQueue.length,
+    pending: pending.length,
+    reviewed: reviewed.length,
+    approved: approved.length,
+    promoted: promoted.length,
+    rejected: reviewQueue.filter((item) => item.status === 'rejected').length,
+    highPriority: reviewQueue.filter((item) => item.reviewPriority === 'high').length,
+    duplicateConflicts: reviewQueue.filter((item) => (item.duplicateCandidates?.length ?? 0) > 0).length,
+    stalePending: stalePending.length,
+    needsPromotion: [...reviewed, ...approved].filter((item) => !item.promotedSourceId).length,
+    nextItems: reviewQueue
+      .filter((item) => item.status === 'pending' || item.status === 'reviewed' || item.status === 'approved')
+      .slice(0, 8),
+  };
+}
+
+function getIngestionOperationsSummary() {
+  const now = Date.now();
+  const dayMs = 86_400_000;
+  return {
+    total: ingestionJobs.length,
+    queued: ingestionJobs.filter((job) => job.status === 'queued').length,
+    running: ingestionJobs.filter((job) => job.status === 'running').length,
+    completed: ingestionJobs.filter((job) => job.status === 'completed').length,
+    failed: ingestionJobs.filter((job) => job.status === 'failed').length,
+    stalled: ingestionJobs.filter((job) => job.status !== 'completed' && now - new Date(job.createdAt).getTime() > dayMs).length,
+    fullTextCandidates: ingestionJobs.filter((job) => job.fullTextCandidate).length,
+    duplicateConflicts: ingestionJobs.filter((job) => (job.duplicateCandidates?.length ?? 0) > 0).length,
+    nextJobs: ingestionJobs.filter((job) => job.status === 'queued' || job.status === 'failed').slice(0, 8),
+  };
+}
+
+function getRevenueOperationsSummary() {
+  return {
+    accounts: accountEntitlements.length,
+    activeAccounts: accountEntitlements.filter((account) => account.status === 'active' || account.status === 'trialing').length,
+    planMix: monetizationPlans.map((plan) => ({
+      planId: plan.id,
+      name: plan.name,
+      accounts: accountEntitlements.filter((account) => account.planId === plan.id).length,
+    })),
+    generatedExports: exportDeliverables.length,
+    monthlyRecurringRevenueCents: accountEntitlements.reduce((total, account) => {
+      const plan = monetizationPlans.find((candidate) => candidate.id === account.planId);
+      if (!plan?.unitAmountCents || account.status !== 'active') {
+        return total;
+      }
+      return total + plan.unitAmountCents;
+    }, 0),
+  };
+}
+
+function getOperationsActionItems(): string[] {
+  const actions: string[] = [];
+  const review = getReviewOperationsSummary();
+  const ingestion = getIngestionOperationsSummary();
+
+  if (getRuntimePersistenceMode() === 'json') {
+    actions.push('Configure DATABASE_URL to activate PostgreSQL runtime persistence.');
+  }
+  if (review.highPriority > 0) {
+    actions.push(`${review.highPriority} high-priority review items need triage.`);
+  }
+  if (review.needsPromotion > 0) {
+    actions.push(`${review.needsPromotion} reviewed or approved items are ready for source promotion.`);
+  }
+  if (review.duplicateConflicts > 0 || ingestion.duplicateConflicts > 0) {
+    actions.push('Resolve duplicate source conflicts before expanding the trusted corpus.');
+  }
+  if (ingestion.failed > 0) {
+    actions.push(`${ingestion.failed} ingestion jobs failed and need retry or rejection decisions.`);
+  }
+  if (accountEntitlements.length === 0) {
+    actions.push('Create at least one entitlement record to test paid workflow gating.');
+  }
+
+  return actions;
+}
+
+function getEntitlement(email?: string): AccountEntitlement {
+  const normalizedEmail = email?.trim().toLocaleLowerCase();
+  const existing = normalizedEmail
+    ? accountEntitlements.find((account) => account.email === normalizedEmail)
+    : undefined;
+
+  if (existing) {
+    return existing;
+  }
+
+  return {
+    email: normalizedEmail || 'anonymous',
+    planId: 'public-library',
+    status: normalizedEmail ? 'active' : 'anonymous',
+    usage: createEmptyUsage(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function upsertEntitlement(
+  email: string,
+  planId: AccountPlanId,
+  status: AccountEntitlement['status'],
+): AccountEntitlement {
+  const normalizedEmail = email.trim().toLocaleLowerCase();
+  const existing = accountEntitlements.find((account) => account.email === normalizedEmail);
+  if (existing) {
+    existing.planId = planId;
+    existing.status = status;
+    existing.updatedAt = new Date().toISOString();
+    return existing;
+  }
+
+  const entitlement: AccountEntitlement = {
+    email: normalizedEmail,
+    planId,
+    status,
+    usage: createEmptyUsage(),
+    updatedAt: new Date().toISOString(),
+  };
+  accountEntitlements.unshift(entitlement);
+  return entitlement;
+}
+
+function createEmptyUsage(): AccountEntitlement['usage'] {
+  return {
+    discoverySearches: 0,
+    sourceImports: 0,
+    assistantGenerations: 0,
+    reviewSubmissions: 0,
+    exports: 0,
+  };
+}
+
+function incrementUsage(c: Context, metric: UsageMetric, explicitEmail?: string): void {
+  const email = explicitEmail ?? c.req.header('x-account-email') ?? c.req.query('email');
+  if (!email) {
+    return;
+  }
+
+  const entitlement = upsertEntitlement(email, getEntitlement(email).planId, getEntitlement(email).status);
+  entitlement.usage[metric] += 1;
+  entitlement.updatedAt = new Date().toISOString();
+}
+
+function assertUsageAllowed(c: Context, metric: UsageMetric, explicitEmail?: string): void {
+  const email = explicitEmail ?? c.req.header('x-account-email') ?? c.req.query('email');
+  if (!email) {
+    return;
+  }
+
+  const entitlement = getEntitlement(email);
+  const plan = monetizationPlans.find((candidate) => candidate.id === entitlement.planId);
+  const limit = plan?.usageLimits[metric];
+
+  if (limit !== null && limit !== undefined && entitlement.usage[metric] >= limit) {
+    throw new Error(`${plan?.name ?? 'Current plan'} has reached its ${metric} limit.`);
+  }
+}
+
+function createExportDeliverable(
+  type: ExportDeliverableType,
+  title?: string,
+  createdByEmail?: string,
+): ExportDeliverable {
+  const generatedTitle = title || exportTitleForType(type);
+  return {
+    id: `export-${Date.now()}-${type}`,
+    type,
+    title: generatedTitle,
+    format: 'markdown',
+    content: renderExportMarkdown(type, generatedTitle),
+    createdAt: new Date().toISOString(),
+    createdByEmail,
+  };
+}
+
+function exportTitleForType(type: ExportDeliverableType): string {
+  const labels: Record<ExportDeliverableType, string> = {
+    'citation-packet': 'Citation Packet',
+    'contradiction-report': 'Contradiction Report',
+    'source-review-dossier': 'Source Review Dossier',
+    'genealogy-summary': 'Genealogy Summary',
+    'bibliography-export': 'Bibliography Export',
+  };
+  return labels[type];
+}
+
+function renderExportMarkdown(type: ExportDeliverableType, title: string): string {
+  if (type === 'bibliography-export') {
+    return [
+      `# ${title}`,
+      '',
+      ...researchDataset.index.bibliography.map(
+        (record) => `- ${record.stableCitation} ${record.archiveUrl ? `(${record.archiveUrl})` : ''}`,
+      ),
+    ].join('\n');
+  }
+
+  if (type === 'genealogy-summary') {
+    return [
+      `# ${title}`,
+      '',
+      '## Nodes',
+      ...researchDataset.genealogy.nodes.map((node) => `- ${node.label}: ${node.description}`),
+      '',
+      '## Edges',
+      ...researchDataset.genealogy.edges.map((edge) => `- ${edge.from} -> ${edge.to}: ${edge.label} (${edge.confidence})`),
+    ].join('\n');
+  }
+
+  if (type === 'source-review-dossier') {
+    return [
+      `# ${title}`,
+      '',
+      ...reviewQueue.slice(0, 25).map((item) =>
+        [
+          `## ${item.title}`,
+          `Status: ${item.status}`,
+          `Priority: ${item.reviewPriority}`,
+          `URL: ${item.url}`,
+          item.citationNotes,
+        ].join('\n'),
+      ),
+    ].join('\n\n');
+  }
+
+  if (type === 'contradiction-report') {
+    return [
+      `# ${title}`,
+      '',
+      ...researchDataset.claims
+        .filter((claim) => claim.evidenceGrade === 'D' || claim.evidenceGrade === 'E' || claim.evidenceGrade === 'F')
+        .map((claim) => `- Grade ${claim.evidenceGrade}: ${claim.text} Notes: ${claim.notes}`),
+    ].join('\n');
+  }
+
+  return [
+    `# ${title}`,
+    '',
+    ...researchDataset.sources.map((source) =>
+      [`## ${source.title}`, `Type: ${source.sourceType}`, `URL: ${source.url}`, source.citationNotes].join('\n'),
+    ),
+  ].join('\n\n');
+}
 
 function slugify(value: string): string {
   return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);

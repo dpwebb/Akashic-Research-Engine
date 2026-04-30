@@ -7,7 +7,7 @@
 
 ## Locked-In Flow
 - Make requested code changes locally in this project directory.
-- Do not commit automatically unless explicitly asked.
+- Commit automatically after completing requested code changes and passing the relevant local checks.
 - Do not push automatically unless explicitly asked.
 - When publishing is requested, commit and push to `main`; the existing GitHub Actions and Hostinger path handle deployment.
 - Do not add or require new secrets, tokens, deploy keys, Hostinger authentication, or GitHub authentication.
