@@ -903,6 +903,25 @@ td span {
   font-weight: 800;
 }
 
+.source-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.source-chip-list a {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 5px 8px;
+  border-radius: 6px;
+  color: #173629;
+  background: #eef3ea;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
 .timeline-record {
   max-width: 920px;
 }

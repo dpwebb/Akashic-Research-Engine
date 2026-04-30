@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BookOpen, CalendarDays, GitCompare, Network, Search, UserRound } from 'lucide-react';
 import { researchDataset } from '../../shared/researchData.js';
 
@@ -37,6 +38,26 @@ function matchesDateRange(text: string, dateFrom: string, dateTo: string): boole
   const from = dateFrom ? Number.parseInt(dateFrom, 10) : Number.NEGATIVE_INFINITY;
   const to = dateTo ? Number.parseInt(dateTo, 10) : Number.POSITIVE_INFINITY;
   return years.some((year) => year >= from && year <= to);
+}
+
+function sourceTitle(sourceId: string): string {
+  return researchDataset.sources.find((source) => source.id === sourceId)?.title ?? sourceId;
+}
+
+function SourceLinks({ sourceIds }: { sourceIds: string[] }) {
+  if (sourceIds.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="source-chip-list" aria-label="Linked sources">
+      {sourceIds.map((sourceId) => (
+        <Link key={sourceId} to={`/claims?sourceId=${encodeURIComponent(sourceId)}`}>
+          {sourceTitle(sourceId)}
+        </Link>
+      ))}
+    </div>
+  );
 }
 
 export function ResearchIndexPage() {
@@ -166,7 +187,7 @@ export function ResearchIndexPage() {
               <h2>{person.name}</h2>
               <p className="muted">{person.role}</p>
               <p>{person.summary}</p>
-              <p className="matched-terms">Sources: {person.sourceIds.join(', ')}</p>
+              <SourceLinks sourceIds={person.sourceIds} />
             </article>
           ))}
         </div>
@@ -180,7 +201,7 @@ export function ResearchIndexPage() {
               <h2>{movement.name}</h2>
               <p className="muted">{movement.period}</p>
               <p>{movement.summary}</p>
-              <p className="matched-terms">Sources: {movement.sourceIds.join(', ')}</p>
+              <SourceLinks sourceIds={movement.sourceIds} />
             </article>
           ))}
         </div>
@@ -195,6 +216,7 @@ export function ResearchIndexPage() {
               <p className="muted">Also: {term.aliases.join(', ')}</p>
               <p>{term.definition}</p>
               <p className="notes">{term.caution}</p>
+              <SourceLinks sourceIds={term.sourceIds} />
             </article>
           ))}
         </div>
@@ -209,7 +231,7 @@ export function ResearchIndexPage() {
               <p className="muted">{concept.tradition}</p>
               <p>{concept.summary}</p>
               <p className="notes">{concept.boundaryNote}</p>
-              <p className="matched-terms">Sources: {concept.sourceIds.join(', ')}</p>
+              <SourceLinks sourceIds={concept.sourceIds} />
             </article>
           ))}
         </div>
@@ -223,6 +245,7 @@ export function ResearchIndexPage() {
               <h2>{event.title}</h2>
               <p>{event.summary}</p>
               <p className="muted">Confidence {event.confidenceLevel} - entities {event.entityIds.join(', ')}</p>
+              <SourceLinks sourceIds={event.sourceIds} />
             </article>
           ))}
         </div>
@@ -248,6 +271,7 @@ export function ResearchIndexPage() {
               <p className="notes">{record.stableCitation}</p>
               <p className="muted">{record.pageReference}</p>
               <p className="notes">{record.auditNote}</p>
+              <Link to={`/claims?sourceId=${encodeURIComponent(record.sourceId)}`}>View linked claims</Link>
               <a href={record.archiveUrl} target="_blank" rel="noreferrer">
                 Open record
               </a>
