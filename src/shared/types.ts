@@ -207,6 +207,14 @@ export type SourceImportPreview = {
   domain: string;
   title: string;
   description: string;
+  contentType: string;
+  detectedAuthor: string;
+  detectedDate: string;
+  wordCount: number;
+  characterCount: number;
+  fullTextCandidate: boolean;
+  citationStatus: 'complete' | 'partial' | 'needs review';
+  qualityFlags: string[];
   textExcerpt: string;
   proposedSourceType: SourceClassification;
   confidenceLevel: 'high' | 'medium' | 'low';

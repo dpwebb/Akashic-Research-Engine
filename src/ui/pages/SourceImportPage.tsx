@@ -57,7 +57,11 @@ export function SourceImportPage() {
           confidenceLevel: preview.confidenceLevel,
           citationNotes: preview.citationNotes,
           reviewerNotes: preview.textExcerpt
-            ? `Import excerpt captured for review: ${preview.textExcerpt.slice(0, 500)}`
+            ? [
+                `Import metadata: ${preview.wordCount.toLocaleString()} words, ${preview.characterCount.toLocaleString()} characters, citation ${preview.citationStatus}, author ${preview.detectedAuthor || 'pending'}, date ${preview.detectedDate || 'pending'}.`,
+                `Quality flags: ${preview.qualityFlags.join(' | ') || 'none'}.`,
+                `Import excerpt captured for review: ${preview.textExcerpt.slice(0, 500)}`,
+              ].join('\n')
             : 'No text excerpt captured.',
         }),
       });
@@ -105,18 +109,37 @@ export function SourceImportPage() {
               <span className="tag">{preview.extractionStatus}</span>
               <span className="tag">{preview.proposedSourceType}</span>
               <span className="tag">{preview.confidenceLevel}</span>
+              <span className="tag">{preview.citationStatus}</span>
+              {preview.fullTextCandidate && <span className="tag">full-text candidate</span>}
             </div>
             <h2>{preview.title}</h2>
             <p className="muted">{preview.domain}</p>
           </div>
           <p>{preview.description}</p>
           <p className="notes">{preview.citationNotes}</p>
+          <div className="import-metadata-grid">
+            <MetadataItem label="Content type" value={preview.contentType} />
+            <MetadataItem label="Detected author" value={preview.detectedAuthor || 'pending review'} />
+            <MetadataItem label="Detected date" value={preview.detectedDate || 'pending review'} />
+            <MetadataItem label="Words" value={preview.wordCount.toLocaleString()} />
+            <MetadataItem label="Characters" value={preview.characterCount.toLocaleString()} />
+          </div>
           {preview.warnings.length > 0 && (
             <div className="panel compact-panel">
               <h3>Warnings</h3>
               <ul className="rule-list">
                 {preview.warnings.map((warning) => (
                   <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {preview.qualityFlags.length > 0 && (
+            <div className="panel compact-panel">
+              <h3>Quality Flags</h3>
+              <ul className="rule-list">
+                {preview.qualityFlags.map((flag) => (
+                  <li key={flag}>{flag}</li>
                 ))}
               </ul>
             </div>
@@ -139,5 +162,14 @@ export function SourceImportPage() {
         </article>
       )}
     </section>
+  );
+}
+
+function MetadataItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }

@@ -898,6 +898,33 @@ td span {
   padding: 14px;
 }
 
+.import-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.import-metadata-grid div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  background: #fbfdf9;
+}
+
+.import-metadata-grid span {
+  color: #5c6c61;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.import-metadata-grid strong {
+  color: #17201b;
+  overflow-wrap: anywhere;
+}
+
 .framework-card svg {
   color: #8a4b24;
 }
