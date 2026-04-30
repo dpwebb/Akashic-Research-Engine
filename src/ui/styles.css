@@ -204,6 +204,70 @@ h2 {
   background: #f7f1e3;
 }
 
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.health-stat {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #fbfdf9;
+}
+
+.health-stat span {
+  color: #5e6b62;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.health-stat strong {
+  font-size: 1.7rem;
+}
+
+.health-stat small {
+  color: #6b3f23;
+  font-weight: 900;
+}
+
+.distribution-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.distribution-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 240px) minmax(160px, 1fr) 40px;
+  gap: 12px;
+  align-items: center;
+}
+
+.distribution-row span {
+  color: #425046;
+  font-weight: 800;
+}
+
+.distribution-row div {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6ebe4;
+}
+
+.distribution-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #f1c66d;
+}
+
+.distribution-row strong {
+  text-align: right;
+}
+
 .grade-card strong,
 .grade {
   display: inline-grid;
@@ -792,7 +856,12 @@ td span {
   .filter-grid,
   .search-summary,
   .filter-panel,
-  .claims-filter-panel {
+  .claims-filter-panel,
+  .distribution-row {
     grid-template-columns: 1fr;
+  }
+
+  .distribution-row strong {
+    text-align: left;
   }
 }
