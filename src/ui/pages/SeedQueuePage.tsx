@@ -5,6 +5,7 @@ import type { ReviewQueueItem, SeedPack } from '../../shared/types.js';
 
 type StatusFilter = 'all' | ReviewQueueItem['status'];
 type ProvenanceFilter = 'all' | ReviewQueueItem['provenance'];
+type PriorityFilter = 'all' | ReviewQueueItem['reviewPriority'];
 
 export function SeedQueuePage() {
   const [seedPacks, setSeedPacks] = useState<SeedPack[]>([]);
@@ -14,6 +15,7 @@ export function SeedQueuePage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [provenanceFilter, setProvenanceFilter] = useState<ProvenanceFilter>('all');
   const [sourceTypeFilter, setSourceTypeFilter] = useState<'all' | SourceClassification>('all');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
 
   useEffect(() => {
     void loadSeedData();
@@ -56,7 +58,16 @@ export function SeedQueuePage() {
   const pendingCount = queueItems.filter((item) => item.status === 'pending').length;
   const approvedCount = queueItems.filter((item) => item.status === 'approved').length;
   const filteredQueueItems = queueItems.filter((item) => {
-    const searchableText = [item.title, item.domain, item.summary, item.citationNotes, item.reviewerNotes]
+    const searchableText = [
+      item.title,
+      item.domain,
+      item.summary,
+      item.citationNotes,
+      item.reviewerNotes,
+      item.reviewPriority,
+      item.qualityFlags.join(' '),
+      item.requiredActions.join(' '),
+    ]
       .join(' ')
       .toLocaleLowerCase();
 
@@ -73,6 +84,10 @@ export function SeedQueuePage() {
     }
 
     if (sourceTypeFilter !== 'all' && item.proposedSourceType !== sourceTypeFilter) {
+      return false;
+    }
+
+    if (priorityFilter !== 'all' && item.reviewPriority !== priorityFilter) {
       return false;
     }
 
@@ -165,6 +180,15 @@ export function SeedQueuePage() {
             ))}
           </select>
         </label>
+        <label>
+          Priority
+          <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)}>
+            <option value="all">All priority</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
       </section>
 
       <section className="source-list">
@@ -175,6 +199,7 @@ export function SeedQueuePage() {
                 <span className="tag">{item.status}</span>
                 <span className="tag">{item.proposedSourceType}</span>
                 <span className="tag">{item.provenance}</span>
+                <span className="tag">{item.reviewPriority} priority</span>
               </div>
               <h2>{item.title}</h2>
               <p className="muted">
@@ -185,6 +210,26 @@ export function SeedQueuePage() {
             </div>
             <p>{item.summary}</p>
             <p className="notes">{item.citationNotes}</p>
+            {item.qualityFlags.length > 0 && (
+              <div className="review-detail-block">
+                <h3>Quality Flags</h3>
+                <ul>
+                  {item.qualityFlags.map((flag) => (
+                    <li key={flag}>{flag}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {item.requiredActions.length > 0 && (
+              <div className="review-detail-block">
+                <h3>Required Review Actions</h3>
+                <ul>
+                  {item.requiredActions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {item.reviewerNotes && <p className="muted">Reviewer notes: {item.reviewerNotes}</p>}
             <div className="review-actions">
               <button type="button" onClick={() => updateStatus(item.id, 'approved')}>

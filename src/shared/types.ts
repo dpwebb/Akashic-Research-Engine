@@ -126,7 +126,10 @@ export type ReviewQueueItem = {
   provenance: 'curated seed' | 'discovery search';
   status: 'pending' | 'approved' | 'rejected';
   confidenceLevel: 'high' | 'medium' | 'low';
+  reviewPriority: 'high' | 'medium' | 'low';
   citationNotes: string;
+  qualityFlags: string[];
+  requiredActions: string[];
   discoveredAt: string;
   reviewedAt?: string;
   reviewerNotes?: string;

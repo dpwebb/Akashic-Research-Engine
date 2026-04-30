@@ -117,7 +117,10 @@ create table review_queue_items (
   provenance text not null check (provenance in ('curated seed', 'discovery search')),
   status text not null check (status in ('pending', 'approved', 'rejected')),
   confidence_level text not null check (confidence_level in ('high', 'medium', 'low')),
+  review_priority text not null default 'medium' check (review_priority in ('high', 'medium', 'low')),
   citation_notes text not null default '',
+  quality_flags text[] not null default '{}',
+  required_actions text[] not null default '{}',
   reviewer_notes text not null default '',
   discovered_at timestamptz not null default now(),
   reviewed_at timestamptz

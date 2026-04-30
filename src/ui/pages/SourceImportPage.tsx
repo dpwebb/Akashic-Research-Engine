@@ -68,7 +68,19 @@ export function SourceImportPage() {
           proposedSourceType: preview.proposedSourceType,
           summary: preview.description,
           confidenceLevel: preview.confidenceLevel,
+          reviewPriority:
+            preview.citationStatus === 'needs review' || preview.proposedSourceType === 'commercial' || preview.proposedSourceType === 'low-quality'
+              ? 'high'
+              : preview.fullTextCandidate
+                ? 'medium'
+                : 'low',
           citationNotes: preview.citationNotes,
+          qualityFlags: preview.qualityFlags,
+          requiredActions: [
+            'Verify author, date, publisher, and stable URL',
+            preview.fullTextCandidate ? 'Queue or complete full-text extraction' : 'Confirm whether full text is available elsewhere',
+            'Record claim-level citation boundaries before promotion',
+          ],
           reviewerNotes: preview.textExcerpt
             ? [
                 `Import metadata: ${preview.wordCount.toLocaleString()} words, ${preview.characterCount.toLocaleString()} characters, citation ${preview.citationStatus}, author ${preview.detectedAuthor || 'pending'}, date ${preview.detectedDate || 'pending'}.`,

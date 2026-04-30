@@ -109,7 +109,10 @@ export type ReviewQueueItemTable = {
   provenance: 'curated seed' | 'discovery search';
   status: 'pending' | 'approved' | 'rejected';
   confidence_level: 'high' | 'medium' | 'low';
+  review_priority: 'high' | 'medium' | 'low';
   citation_notes: string;
+  quality_flags: string[];
+  required_actions: string[];
   reviewer_notes: string;
   discovered_at: Generated<Date>;
   reviewed_at: Date | null;

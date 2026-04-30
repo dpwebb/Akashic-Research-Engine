@@ -9,7 +9,7 @@ import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
 import { previewSourceImport } from './src/server/importing/sourceImport.js';
 import { researchDataset } from './src/shared/researchData.js';
 import { seedPacks, seedReviewQueue } from './src/shared/seedData.js';
-import { evidenceGrades, guardrailRules, sourceClassifications } from './src/shared/taxonomy.js';
+import { evidenceGrades, guardrailRules, sourceClassifications, type SourceClassification } from './src/shared/taxonomy.js';
 import { promptTemplates } from './src/shared/promptTemplates.js';
 import type { IngestionJob, ReviewQueueItem } from './src/shared/types.js';
 
@@ -70,7 +70,10 @@ const reviewQueueItemSchema = z.object({
   proposedSourceType: z.enum(sourceClassifications),
   summary: z.string().min(1).max(1400),
   confidenceLevel: z.enum(['high', 'medium', 'low']).default('low'),
+  reviewPriority: z.enum(['high', 'medium', 'low']).optional(),
   citationNotes: z.string().min(1).max(1200),
+  qualityFlags: z.array(z.string().min(1).max(160)).max(12).optional(),
+  requiredActions: z.array(z.string().min(1).max(220)).max(12).optional(),
   reviewerNotes: z.string().max(1200).optional(),
 });
 
@@ -86,6 +89,9 @@ app.post('/api/review-queue', async (c) => {
     const item: ReviewQueueItem = {
       id: `discovery-${Date.now()}-${slugify(input.url)}`,
       ...input,
+      reviewPriority: input.reviewPriority ?? inferReviewPriority(input.proposedSourceType, input.confidenceLevel),
+      qualityFlags: input.qualityFlags ?? inferReviewQualityFlags(input.proposedSourceType, input.citationNotes),
+      requiredActions: input.requiredActions ?? inferRequiredActions(input.proposedSourceType),
       provenance: 'discovery search',
       status: 'pending',
       discoveredAt: new Date().toISOString(),
@@ -234,6 +240,48 @@ app.get('/api/addition-builder/frameworks', (c) => c.json(researchDataset.additi
 
 function slugify(value: string): string {
   return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
+}
+
+function inferReviewPriority(sourceType: SourceClassification, confidence: ReviewQueueItem['confidenceLevel']): ReviewQueueItem['reviewPriority'] {
+  if (sourceType === 'commercial' || sourceType === 'low-quality' || confidence === 'low') {
+    return 'high';
+  }
+
+  if (sourceType === 'primary esoteric' || sourceType === 'modern spiritual') {
+    return 'medium';
+  }
+
+  return 'low';
+}
+
+function inferReviewQualityFlags(sourceType: SourceClassification, citationNotes: string): string[] {
+  const flags: string[] = [];
+
+  if (sourceType === 'commercial' || sourceType === 'low-quality') {
+    flags.push('low-trust source');
+  }
+
+  if (sourceType === 'primary esoteric' || sourceType === 'modern spiritual') {
+    flags.push('claim/testimony boundary needed');
+  }
+
+  if (/page|edition|citation|verify/i.test(citationNotes)) {
+    flags.push('citation verification needed');
+  }
+
+  return flags.length > 0 ? flags : ['standard source review'];
+}
+
+function inferRequiredActions(sourceType: SourceClassification): string[] {
+  if (sourceType === 'commercial' || sourceType === 'low-quality') {
+    return ['Corroborate claims independently', 'Reject promotional claims without primary support'];
+  }
+
+  if (sourceType === 'primary esoteric' || sourceType === 'modern spiritual') {
+    return ['Extract claim-level citations', 'Label testimony separately from historical fact'];
+  }
+
+  return ['Verify author, publisher, date, and stable URL', 'Record citation-ready page or section reference'];
 }
 
 app.use('/_assets/*', serveStatic({ root: './dist' }));
