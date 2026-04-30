@@ -1,17 +1,19 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
-import { Archive, Bot, GitFork, Home, Library, Scale, Sparkles } from 'lucide-react';
+import { Archive, Bot, GitFork, Home, Library, Radar, Scale, Sparkles } from 'lucide-react';
 import { Dashboard } from './pages/Dashboard.js';
 import { SourcesPage } from './pages/SourcesPage.js';
 import { ClaimsPage } from './pages/ClaimsPage.js';
 import { GenealogyPage } from './pages/GenealogyPage.js';
 import { AssistantPage } from './pages/AssistantPage.js';
 import { AdditionBuilderPage } from './pages/AdditionBuilderPage.js';
+import { DiscoveryPage } from './pages/DiscoveryPage.js';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home },
   { to: '/sources', label: 'Sources', icon: Library },
   { to: '/claims', label: 'Claims', icon: Scale },
   { to: '/genealogy', label: 'Genealogy', icon: GitFork },
+  { to: '/discovery', label: 'Discovery', icon: Radar },
   { to: '/assistant', label: 'Assistant', icon: Bot },
   { to: '/addition-builder', label: 'Builder', icon: Sparkles },
 ];
@@ -45,6 +47,7 @@ export function App() {
           <Route path="/sources" element={<SourcesPage />} />
           <Route path="/claims" element={<ClaimsPage />} />
           <Route path="/genealogy" element={<GenealogyPage />} />
+          <Route path="/discovery" element={<DiscoveryPage />} />
           <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/addition-builder" element={<AdditionBuilderPage />} />
         </Routes>

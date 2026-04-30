@@ -44,3 +44,27 @@ export type AdditionFramework = {
   description: string;
   requiredBoundaries: string[];
 };
+
+export type DiscoverySearchRequest = {
+  query: string;
+  maxResults: number;
+  inspectPages: boolean;
+};
+
+export type DiscoverySearchResult = {
+  title: string;
+  url: string;
+  domain: string;
+  snippet: string;
+  inspected: boolean;
+  pageTitle?: string;
+  pageDescription?: string;
+  pageExcerpt?: string;
+  discoveredAt: string;
+};
+
+export type DiscoverySearchResponse = {
+  query: string;
+  results: DiscoverySearchResult[];
+  warnings: string[];
+};

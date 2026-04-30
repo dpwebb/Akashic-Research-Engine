@@ -366,6 +366,7 @@ td span {
 }
 
 .assistant-form select,
+.assistant-form input,
 .assistant-form textarea {
   width: 100%;
   border: 1px solid #bfcbc2;
@@ -380,6 +381,9 @@ td span {
 }
 
 .assistant-form button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
   width: fit-content;
   border: 0;
   border-radius: 8px;
@@ -407,6 +411,33 @@ td span {
   white-space: pre-wrap;
 }
 
+.discovery-form {
+  max-width: 760px;
+}
+
+.discovery-controls {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(220px, 1fr);
+  gap: 14px;
+  align-items: end;
+}
+
+.assistant-form .check-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  min-height: 45px;
+}
+
+.assistant-form .check-row input {
+  width: auto;
+}
+
+.discovery-results .panel p:last-child {
+  margin-bottom: 0;
+}
+
 .framework-card svg {
   color: #8a4b24;
 }
@@ -427,5 +458,9 @@ td span {
 
   .content {
     padding: 22px;
+  }
+
+  .discovery-controls {
+    grid-template-columns: 1fr;
   }
 }
