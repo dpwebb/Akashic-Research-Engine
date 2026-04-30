@@ -1,14 +1,58 @@
-import { FormEvent, useState } from 'react';
-import { ExternalLink, Search } from 'lucide-react';
+import { FormEvent, useMemo, useState } from 'react';
+import { ExternalLink, Filter, Search } from 'lucide-react';
+import { sourceClassifications, type SourceClassification } from '../../shared/taxonomy.js';
 import type { DiscoverySearchResponse } from '../../shared/types.js';
+
+type SearchScope = 'combined' | 'engine' | 'web';
+
+function parseList(value: string): string[] {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 export function DiscoveryPage() {
   const [query, setQuery] = useState('Akashic Records historical sources');
-  const [maxResults, setMaxResults] = useState(6);
+  const [scope, setScope] = useState<SearchScope>('combined');
+  const [maxResults, setMaxResults] = useState(8);
   const [inspectPages, setInspectPages] = useState(true);
+  const [exactPhrase, setExactPhrase] = useState('');
+  const [includeTerms, setIncludeTerms] = useState('');
+  const [excludeTerms, setExcludeTerms] = useState('course, paid reading');
+  const [domains, setDomains] = useState('');
+  const [selectedSourceTypes, setSelectedSourceTypes] = useState<SourceClassification[]>([]);
+  const [minRelevance, setMinRelevance] = useState(0);
   const [response, setResponse] = useState<DiscoverySearchResponse | null>(null);
   const [error, setError] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+
+  const searchPayload = useMemo(
+    () => ({
+      query,
+      scope,
+      maxResults,
+      inspectPages,
+      exactPhrase: exactPhrase.trim() || undefined,
+      includeTerms: parseList(includeTerms),
+      excludeTerms: parseList(excludeTerms),
+      domains: parseList(domains),
+      sourceTypes: selectedSourceTypes,
+      minRelevance,
+    }),
+    [
+      query,
+      scope,
+      maxResults,
+      inspectPages,
+      exactPhrase,
+      includeTerms,
+      excludeTerms,
+      domains,
+      selectedSourceTypes,
+      minRelevance,
+    ],
+  );
 
   async function runDiscovery(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -20,7 +64,7 @@ export function DiscoveryPage() {
       const searchResponse = await fetch('/api/discovery/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, maxResults, inspectPages }),
+        body: JSON.stringify(searchPayload),
       });
       const data = await searchResponse.json();
 
@@ -36,17 +80,25 @@ export function DiscoveryPage() {
     }
   }
 
+  function toggleSourceType(sourceType: SourceClassification) {
+    setSelectedSourceTypes((current) =>
+      current.includes(sourceType)
+        ? current.filter((item) => item !== sourceType)
+        : [...current, sourceType],
+    );
+  }
+
   return (
     <section className="page-stack">
       <header className="page-header compact">
-        <p className="eyebrow">Internet discovery</p>
-        <h1>Research Spider</h1>
-        <p>Run targeted public web searches and inspect result pages for citation leads.</p>
+        <p className="eyebrow">Research search</p>
+        <h1>Discovery Engine</h1>
+        <p>Search the engine corpus and the public web with precise filters, relevance scoring, and citation review cues.</p>
       </header>
 
       <form className="assistant-form discovery-form" onSubmit={runDiscovery}>
         <label>
-          Search query
+          Research query
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -55,6 +107,20 @@ export function DiscoveryPage() {
             placeholder="Example: Akashic Records historical sources"
           />
         </label>
+
+        <div className="scope-control" aria-label="Search scope">
+          {(['combined', 'engine', 'web'] as const).map((item) => (
+            <button
+              className={scope === item ? 'active' : ''}
+              key={item}
+              type="button"
+              onClick={() => setScope(item)}
+            >
+              {item === 'combined' ? 'Combined' : item === 'engine' ? 'Engine Corpus' : 'Public Web'}
+            </button>
+          ))}
+        </div>
+
         <div className="discovery-controls">
           <label>
             Results
@@ -62,31 +128,120 @@ export function DiscoveryPage() {
               value={maxResults}
               onChange={(event) => setMaxResults(Number.parseInt(event.target.value, 10))}
             >
-              {[4, 6, 8, 10, 12].map((count) => (
+              {[6, 8, 10, 12, 16, 20].map((count) => (
                 <option key={count} value={count}>
                   {count}
                 </option>
               ))}
             </select>
           </label>
+          <label>
+            Minimum relevance
+            <input
+              max={100}
+              min={0}
+              type="number"
+              value={minRelevance}
+              onChange={(event) => setMinRelevance(Number.parseInt(event.target.value, 10) || 0)}
+            />
+          </label>
           <label className="check-row">
             <input
               type="checkbox"
               checked={inspectPages}
+              disabled={scope === 'engine'}
               onChange={(event) => setInspectPages(event.target.checked)}
             />
-            Inspect result pages
+            Inspect web pages
           </label>
         </div>
+
+        <details className="advanced-search" open>
+          <summary>
+            <Filter aria-hidden="true" />
+            Granular filters
+          </summary>
+          <div className="filter-grid">
+            <label>
+              Exact phrase
+              <input
+                value={exactPhrase}
+                onChange={(event) => setExactPhrase(event.target.value)}
+                maxLength={160}
+                placeholder="Example: cosmic memory"
+              />
+            </label>
+            <label>
+              Required terms
+              <input
+                value={includeTerms}
+                onChange={(event) => setIncludeTerms(event.target.value)}
+                placeholder="Comma-separated terms"
+              />
+            </label>
+            <label>
+              Excluded terms
+              <input
+                value={excludeTerms}
+                onChange={(event) => setExcludeTerms(event.target.value)}
+                placeholder="Comma-separated terms"
+              />
+            </label>
+            <label>
+              Domains
+              <input
+                value={domains}
+                onChange={(event) => setDomains(event.target.value)}
+                placeholder="Example: archive.org, rsarchive.org"
+              />
+            </label>
+          </div>
+
+          <div className="source-type-filter" aria-label="Source classifications">
+            {sourceClassifications.map((sourceType) => (
+              <button
+                className={selectedSourceTypes.includes(sourceType) ? 'active' : ''}
+                key={sourceType}
+                type="button"
+                onClick={() => toggleSourceType(sourceType)}
+              >
+                {sourceType}
+              </button>
+            ))}
+          </div>
+        </details>
+
         <button type="submit" disabled={isSearching || query.trim().length < 3}>
           <Search aria-hidden="true" />
-          {isSearching ? 'Searching...' : 'Search Web'}
+          {isSearching ? 'Searching...' : 'Run Search'}
         </button>
         {error && <p className="form-error">{error}</p>}
       </form>
 
       {response && (
-        <section className="source-list discovery-results">
+        <section className="search-output">
+          <div className="search-summary">
+            <article>
+              <span>Engine</span>
+              <strong>{response.summary.engineMatches}</strong>
+            </article>
+            <article>
+              <span>Web</span>
+              <strong>{response.summary.webMatches}</strong>
+            </article>
+            <article>
+              <span>Inspected</span>
+              <strong>{response.summary.inspectedPages}</strong>
+            </article>
+          </div>
+
+          {response.effectiveWebQuery && response.effectiveWebQuery !== response.query && (
+            <div className="panel query-panel">
+              <h2>Effective Web Query</h2>
+              <p>{response.effectiveWebQuery}</p>
+            </div>
+          )}
+
           {response.warnings.length > 0 && (
             <div className="panel">
               <h2>Warnings</h2>
@@ -98,24 +253,40 @@ export function DiscoveryPage() {
             </div>
           )}
 
-          {response.results.map((result) => (
-            <article className="source-card" key={result.url}>
-              <div>
-                <span className="tag">{result.domain}</span>
-                <h2>{result.pageTitle || result.title}</h2>
-                <p className="muted">
-                  Discovered {new Date(result.discoveredAt).toLocaleString()} ·{' '}
-                  {result.inspected ? 'page inspected' : 'search result only'}
-                </p>
-              </div>
-              {result.pageDescription && <p>{result.pageDescription}</p>}
-              {result.snippet && <p className="notes">{result.snippet}</p>}
-              {result.pageExcerpt && <p className="muted">{result.pageExcerpt}</p>}
-              <a href={result.url} target="_blank" rel="noreferrer">
-                Open result <ExternalLink aria-hidden="true" />
-              </a>
-            </article>
-          ))}
+          <div className="source-list discovery-results">
+            {response.results.map((result) => (
+              <article className="source-card search-result-card" key={result.id}>
+                <div>
+                  <div className="result-meta">
+                    <span className="tag">{result.origin}</span>
+                    <span className="tag">{result.category}</span>
+                    {result.sourceType && <span className="tag">{result.sourceType}</span>}
+                  </div>
+                  <h2>{result.pageTitle || result.title}</h2>
+                  <p className="muted">
+                    Score {result.relevanceScore} · {result.domain} ·{' '}
+                    {result.inspected ? 'inspected' : 'not inspected'}
+                  </p>
+                </div>
+                {result.pageDescription && <p>{result.pageDescription}</p>}
+                {result.snippet && <p className="notes">{result.snippet}</p>}
+                {result.pageExcerpt && <p className="muted">{result.pageExcerpt}</p>}
+                {result.matchedTerms.length > 0 && (
+                  <p className="matched-terms">Matched: {result.matchedTerms.join(', ')}</p>
+                )}
+                <ul className="research-notes">
+                  {result.researchNotes.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+                {result.url && (
+                  <a href={result.url} target="_blank" rel="noreferrer">
+                    Open result <ExternalLink aria-hidden="true" />
+                  </a>
+                )}
+              </article>
+            ))}
+          </div>
         </section>
       )}
     </section>

@@ -2,7 +2,9 @@ import type {
   DiscoverySearchRequest,
   DiscoverySearchResponse,
   DiscoverySearchResult,
+  Source,
 } from '../../shared/types.js';
+import { researchDataset } from '../../shared/researchData.js';
 
 const searchEndpoint = 'https://html.duckduckgo.com/html/';
 const userAgent =
@@ -16,26 +18,174 @@ type RawSearchResult = {
   snippet: string;
 };
 
+type NormalizedDiscoverySearchRequest = DiscoverySearchRequest & {
+  scope: 'combined' | 'engine' | 'web';
+  includeTerms: string[];
+  excludeTerms: string[];
+  domains: string[];
+  minRelevance: number;
+};
+
 export async function discoverRelatedSources(
   request: DiscoverySearchRequest,
 ): Promise<DiscoverySearchResponse> {
   const warnings: string[] = [];
   const query = request.query.trim();
-  const maxResults = Math.min(Math.max(request.maxResults, 1), 12);
+  const normalizedRequest = normalizeRequest(request);
+  const maxResults = Math.min(Math.max(normalizedRequest.maxResults, 1), 20);
+  const effectiveWebQuery = buildWebQuery(query, normalizedRequest);
+  const engineResults =
+    normalizedRequest.scope === 'web' ? [] : searchEngineCorpus(normalizedRequest);
+  let webResults: DiscoverySearchResult[] = [];
 
-  const rawResults = await searchDuckDuckGo(query, maxResults);
-  if (rawResults.length === 0) {
-    warnings.push('No public search results were returned for this query.');
+  if (normalizedRequest.scope !== 'engine') {
+    const rawResults = await searchDuckDuckGo(effectiveWebQuery, maxResults);
+    if (rawResults.length === 0) {
+      warnings.push('No public search results were returned for this query.');
+    }
+
+    webResults = normalizedRequest.inspectPages
+      ? await inspectResults(rawResults, normalizedRequest, warnings)
+      : rawResults.map((result, index) => toDiscoveryResult(result, normalizedRequest, index));
   }
 
-  const results = request.inspectPages
-    ? await inspectResults(rawResults, warnings)
-    : rawResults.map((result) => toDiscoveryResult(result));
+  const filteredResults = [...engineResults, ...webResults]
+    .filter((result) => passesGranularFilters(result, normalizedRequest))
+    .filter((result) => result.relevanceScore >= normalizedRequest.minRelevance)
+    .sort((first, second) => second.relevanceScore - first.relevanceScore)
+    .slice(0, maxResults);
 
   return {
     query,
-    results,
+    effectiveWebQuery,
+    results: filteredResults,
     warnings,
+    summary: {
+      engineMatches: filteredResults.filter((result) => result.origin === 'engine').length,
+      webMatches: filteredResults.filter((result) => result.origin === 'web').length,
+      inspectedPages: filteredResults.filter((result) => result.inspected).length,
+    },
+  };
+}
+
+function normalizeRequest(request: DiscoverySearchRequest): NormalizedDiscoverySearchRequest {
+  return {
+    ...request,
+    scope: request.scope ?? 'combined',
+    includeTerms: normalizeTerms(request.includeTerms),
+    excludeTerms: normalizeTerms(request.excludeTerms),
+    domains: normalizeTerms(request.domains).map((domain) => domain.replace(/^https?:\/\//, '')),
+    sourceTypes: request.sourceTypes ?? [],
+    exactPhrase: request.exactPhrase?.trim(),
+    minRelevance: request.minRelevance ?? 0,
+  };
+}
+
+function normalizeTerms(terms: string[] | undefined): string[] {
+  return [...new Set((terms ?? []).map((term) => term.trim()).filter(Boolean))];
+}
+
+function buildWebQuery(query: string, request: NormalizedDiscoverySearchRequest): string {
+  const parts = [query];
+
+  if (request.exactPhrase) {
+    parts.push(`"${request.exactPhrase}"`);
+  }
+
+  for (const term of request.includeTerms ?? []) {
+    parts.push(term.includes(' ') ? `"${term}"` : term);
+  }
+
+  for (const term of request.excludeTerms ?? []) {
+    parts.push(`-${term.includes(' ') ? `"${term}"` : term}`);
+  }
+
+  for (const domain of request.domains ?? []) {
+    parts.push(`site:${domain}`);
+  }
+
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): DiscoverySearchResult[] {
+  const sourceMatches = researchDataset.sources.map((source) => scoreSource(source, request));
+  const claimMatches: DiscoverySearchResult[] = researchDataset.claims.map((claim) => {
+    const source = researchDataset.sources.find((item) => item.id === claim.sourceId);
+    const text = [claim.text, claim.type, claim.notes, source?.title, source?.summary].join(' ');
+    const score = scoreText(text, request);
+
+    return {
+      id: `engine-claim-${claim.id}`,
+      origin: 'engine',
+      category: 'claim',
+      title: claim.text,
+      url: source?.url ?? '',
+      domain: source ? getDomain(source.url) : 'engine corpus',
+      snippet: claim.notes,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      sourceType: source?.sourceType,
+      confidenceLevel: claim.confidenceLevel,
+      evidenceGrade: claim.evidenceGrade,
+      researchNotes: [
+        `Claim type: ${claim.type}`,
+        claim.citationRequired ? 'Citation required before reuse.' : 'Citation optional by current taxonomy.',
+      ],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
+  const genealogyMatches: DiscoverySearchResult[] = researchDataset.genealogy.nodes.map((node) => {
+    const text = [node.label, node.period, node.category, node.description].join(' ');
+    const score = scoreText(text, request);
+
+    return {
+      id: `engine-genealogy-${node.id}`,
+      origin: 'engine',
+      category: 'genealogy',
+      title: node.label,
+      url: '',
+      domain: 'engine corpus',
+      snippet: `${node.period}. ${node.description}`,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      confidenceLevel: 'medium',
+      researchNotes: [`Genealogy category: ${node.category}`],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
+
+  return [...sourceMatches, ...claimMatches, ...genealogyMatches].filter((result) => {
+    if (result.relevanceScore <= 0) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function scoreSource(source: Source, request: NormalizedDiscoverySearchRequest): DiscoverySearchResult {
+  const text = [source.title, source.author, source.date, source.sourceType, source.summary, source.citationNotes].join(
+    ' ',
+  );
+  const score = scoreText(text, request);
+
+  return {
+    id: `engine-source-${source.id}`,
+    origin: 'engine',
+    category: 'source',
+    title: source.title,
+    url: source.url,
+    domain: getDomain(source.url),
+    snippet: source.summary,
+    inspected: true,
+    relevanceScore: score.score,
+    matchedTerms: score.matchedTerms,
+    sourceType: source.sourceType,
+    confidenceLevel: source.confidenceLevel,
+    researchNotes: [source.citationNotes, `Author/date: ${source.author}, ${source.date}`],
+    discoveredAt: new Date().toISOString(),
   };
 }
 
@@ -60,27 +210,32 @@ async function searchDuckDuckGo(query: string, maxResults: number): Promise<RawS
 
 async function inspectResults(
   rawResults: RawSearchResult[],
+  request: NormalizedDiscoverySearchRequest,
   warnings: string[],
 ): Promise<DiscoverySearchResult[]> {
   const inspected: DiscoverySearchResult[] = [];
 
-  for (const result of rawResults) {
+  for (const [index, result] of rawResults.entries()) {
     try {
-      inspected.push(await inspectResult(result));
+      inspected.push(await inspectResult(result, request, index));
     } catch (error) {
       warnings.push(
         `Could not inspect ${getDomain(result.url)}: ${
           error instanceof Error ? error.message : 'page fetch failed'
         }`,
       );
-      inspected.push(toDiscoveryResult(result));
+      inspected.push(toDiscoveryResult(result, request, index));
     }
   }
 
   return inspected;
 }
 
-async function inspectResult(result: RawSearchResult): Promise<DiscoverySearchResult> {
+async function inspectResult(
+  result: RawSearchResult,
+  request: NormalizedDiscoverySearchRequest,
+  index: number,
+): Promise<DiscoverySearchResult> {
   const response = await fetchWithTimeout(result.url, {
     headers: {
       Accept: 'text/html,application/xhtml+xml',
@@ -95,13 +250,13 @@ async function inspectResult(result: RawSearchResult): Promise<DiscoverySearchRe
 
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.includes('text/html')) {
-    return toDiscoveryResult(result, { inspected: true });
+    return toDiscoveryResult(result, request, index, { inspected: true });
   }
 
   const html = await readLimitedText(response);
   const visibleText = extractVisibleText(html);
 
-  return toDiscoveryResult(result, {
+  return toDiscoveryResult(result, request, index, {
     inspected: true,
     pageTitle: extractTagContent(html, 'title'),
     pageDescription: extractMetaContent(html, 'description'),
@@ -162,17 +317,192 @@ function normalizeDuckDuckGoUrl(url: string): string {
 
 function toDiscoveryResult(
   result: RawSearchResult,
+  request: NormalizedDiscoverySearchRequest,
+  index: number,
   inspectedData: Partial<DiscoverySearchResult> = {},
 ): DiscoverySearchResult {
+  const scoringText = [
+    result.title,
+    result.snippet,
+    inspectedData.pageTitle,
+    inspectedData.pageDescription,
+    inspectedData.pageExcerpt,
+    result.url,
+  ].join(' ');
+  const score = scoreText(scoringText, request);
+  const sourceType = classifyWebResult(result, inspectedData);
+
   return {
+    id: `web-${index}-${slugify(result.url)}`,
+    origin: 'web',
+    category: 'webpage',
     title: result.title,
     url: result.url,
     domain: getDomain(result.url),
     snippet: result.snippet,
     inspected: false,
+    relevanceScore: score.score + Math.max(0, 12 - index),
+    matchedTerms: score.matchedTerms,
+    sourceType,
+    confidenceLevel: inferConfidenceLevel(sourceType),
+    researchNotes: buildResearchNotes(result, sourceType),
     discoveredAt: new Date().toISOString(),
     ...inspectedData,
   };
+}
+
+function scoreText(
+  text: string,
+  request: NormalizedDiscoverySearchRequest,
+): { score: number; matchedTerms: string[] } {
+  const normalizedText = text.toLocaleLowerCase();
+  const queryTerms = tokenize(request.query);
+  const includeTerms = request.includeTerms ?? [];
+  const excludeTerms = request.excludeTerms ?? [];
+  const matchedTerms = new Set<string>();
+  let score = 0;
+
+  for (const term of queryTerms) {
+    if (normalizedText.includes(term.toLocaleLowerCase())) {
+      score += 10;
+      matchedTerms.add(term);
+    }
+  }
+
+  for (const term of includeTerms) {
+    if (normalizedText.includes(term.toLocaleLowerCase())) {
+      score += 14;
+      matchedTerms.add(term);
+    } else {
+      score -= 10;
+    }
+  }
+
+  if (request.exactPhrase && normalizedText.includes(request.exactPhrase.toLocaleLowerCase())) {
+    score += 30;
+    matchedTerms.add(request.exactPhrase);
+  }
+
+  for (const term of excludeTerms) {
+    if (normalizedText.includes(term.toLocaleLowerCase())) {
+      score -= 50;
+    }
+  }
+
+  return { score: Math.max(0, score), matchedTerms: [...matchedTerms] };
+}
+
+function passesGranularFilters(
+  result: DiscoverySearchResult,
+  request: NormalizedDiscoverySearchRequest,
+): boolean {
+  const searchableText = [
+    result.title,
+    result.snippet,
+    result.pageTitle,
+    result.pageDescription,
+    result.pageExcerpt,
+    result.url,
+    result.domain,
+    result.researchNotes.join(' '),
+  ]
+    .join(' ')
+    .toLocaleLowerCase();
+
+  if (request.sourceTypes?.length && !result.sourceType) {
+    return false;
+  }
+
+  if (request.sourceTypes?.length && result.sourceType && !request.sourceTypes.includes(result.sourceType)) {
+    return false;
+  }
+
+  if (request.includeTerms.some((term) => !searchableText.includes(term.toLocaleLowerCase()))) {
+    return false;
+  }
+
+  if (request.excludeTerms.some((term) => searchableText.includes(term.toLocaleLowerCase()))) {
+    return false;
+  }
+
+  if (request.exactPhrase && !searchableText.includes(request.exactPhrase.toLocaleLowerCase())) {
+    return false;
+  }
+
+  return true;
+}
+
+function tokenize(value: string): string[] {
+  return [...new Set(value.toLocaleLowerCase().match(/[a-z0-9]{3,}/g) ?? [])];
+}
+
+function classifyWebResult(
+  result: RawSearchResult,
+  inspectedData: Partial<DiscoverySearchResult>,
+): DiscoverySearchResult['sourceType'] {
+  const text = [result.title, result.snippet, inspectedData.pageTitle, inspectedData.pageDescription, result.url]
+    .join(' ')
+    .toLocaleLowerCase();
+  const domain = getDomain(result.url);
+
+  if (domain.endsWith('.edu') || text.includes('journal') || text.includes('university')) {
+    return 'academic';
+  }
+
+  if (text.includes('archive') || text.includes('history') || text.includes('historical')) {
+    return 'historical';
+  }
+
+  if (text.includes('theosophy') || text.includes('anthroposophy') || text.includes('steiner')) {
+    return 'primary esoteric';
+  }
+
+  if (text.includes('course') || text.includes('session') || text.includes('healing') || text.includes('reading')) {
+    return 'modern spiritual';
+  }
+
+  if (text.includes('buy') || text.includes('shop') || text.includes('price')) {
+    return 'commercial';
+  }
+
+  return 'speculative';
+}
+
+function inferConfidenceLevel(sourceType: DiscoverySearchResult['sourceType']): DiscoverySearchResult['confidenceLevel'] {
+  if (sourceType === 'academic' || sourceType === 'historical' || sourceType === 'primary esoteric') {
+    return 'medium';
+  }
+
+  if (sourceType === 'commercial' || sourceType === 'low-quality') {
+    return 'low';
+  }
+
+  return 'medium';
+}
+
+function buildResearchNotes(
+  result: RawSearchResult,
+  sourceType: DiscoverySearchResult['sourceType'],
+): string[] {
+  const notes = [`Preliminary classification: ${sourceType ?? 'unclassified'}.`];
+
+  if (sourceType === 'commercial') {
+    notes.push('Treat promotional claims cautiously and corroborate with independent sources.');
+  }
+
+  if (sourceType === 'academic' || sourceType === 'historical') {
+    notes.push('Review citations and publication context before adding claims to the corpus.');
+  }
+
+  if (!result.snippet) {
+    notes.push('Search provider did not return a snippet; inspect the page before using it.');
+  }
+
+  return notes;
+}
+
+function slugify(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
 }
 
 async function fetchWithTimeout(input: string, init: RequestInit): Promise<Response> {

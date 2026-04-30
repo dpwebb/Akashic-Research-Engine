@@ -54,8 +54,15 @@ app.get('/api/assistant/prompts', (c) => c.json(promptTemplates));
 
 const discoverySearchSchema = z.object({
   query: z.string().min(3).max(240),
-  maxResults: z.number().int().min(1).max(12).default(6),
+  scope: z.enum(['combined', 'engine', 'web']).default('combined'),
+  maxResults: z.number().int().min(1).max(20).default(8),
   inspectPages: z.boolean().default(true),
+  exactPhrase: z.string().max(160).optional(),
+  includeTerms: z.array(z.string().min(1).max(80)).max(12).default([]),
+  excludeTerms: z.array(z.string().min(1).max(80)).max(12).default([]),
+  domains: z.array(z.string().min(3).max(120)).max(8).default([]),
+  sourceTypes: z.array(z.enum(sourceClassifications)).max(8).default([]),
+  minRelevance: z.number().int().min(0).max(100).default(0),
 });
 
 app.post('/api/discovery/search', async (c) => {

@@ -412,14 +412,68 @@ td span {
 }
 
 .discovery-form {
-  max-width: 760px;
+  max-width: 960px;
 }
 
 .discovery-controls {
   display: grid;
-  grid-template-columns: minmax(120px, 180px) minmax(220px, 1fr);
+  grid-template-columns: minmax(120px, 180px) minmax(140px, 180px) minmax(220px, 1fr);
   gap: 14px;
   align-items: end;
+}
+
+.scope-control,
+.source-type-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scope-control button,
+.source-type-filter button {
+  border: 1px solid #bfcbc2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #304038;
+  background: #fbfdf9;
+  cursor: pointer;
+}
+
+.scope-control button.active,
+.source-type-filter button.active {
+  border-color: #173629;
+  color: #173629;
+  background: #f1c66d;
+  font-weight: 900;
+}
+
+.advanced-search {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  background: #fbfdf9;
+}
+
+.advanced-search summary {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: #304038;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.advanced-search[open] summary {
+  margin-bottom: 14px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .assistant-form .check-row {
@@ -436,6 +490,67 @@ td span {
 
 .discovery-results .panel p:last-child {
   margin-bottom: 0;
+}
+
+.search-output {
+  display: grid;
+  gap: 16px;
+}
+
+.search-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 12px;
+  max-width: 640px;
+}
+
+.search-summary article {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.search-summary span {
+  color: #5e6b62;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.search-summary strong {
+  font-size: 1.6rem;
+}
+
+.query-panel p {
+  overflow-wrap: anywhere;
+  margin-bottom: 0;
+  color: #425046;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.search-result-card {
+  gap: 14px;
+}
+
+.result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.matched-terms {
+  margin-bottom: 0;
+  color: #6b3f23;
+  font-weight: 800;
+}
+
+.research-notes {
+  margin: 0;
+  padding-left: 20px;
+  color: #425046;
 }
 
 .framework-card svg {
@@ -461,6 +576,11 @@ td span {
   }
 
   .discovery-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-grid,
+  .search-summary {
     grid-template-columns: 1fr;
   }
 }
