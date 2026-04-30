@@ -16,6 +16,7 @@ export function SeedQueuePage() {
   const [provenanceFilter, setProvenanceFilter] = useState<ProvenanceFilter>('all');
   const [sourceTypeFilter, setSourceTypeFilter] = useState<'all' | SourceClassification>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     void loadSeedData();
@@ -40,10 +41,11 @@ export function SeedQueuePage() {
   }
 
   async function updateStatus(id: string, status: ReviewQueueItem['status']) {
+    const reviewerNotes = reviewNotes[id]?.trim();
     const response = await fetch(`/api/review-queue/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, reviewerNotes: reviewerNotes || undefined }),
     });
 
     if (!response.ok) {
@@ -53,6 +55,7 @@ export function SeedQueuePage() {
 
     const updatedItem = await response.json();
     setQueueItems((current) => current.map((item) => (item.id === updatedItem.id ? updatedItem : item)));
+    setReviewNotes((current) => ({ ...current, [id]: '' }));
   }
 
   async function promoteItem(id: string) {
@@ -268,6 +271,15 @@ export function SeedQueuePage() {
             )}
             {item.reviewerNotes && <p className="muted">Reviewer notes: {item.reviewerNotes}</p>}
             {item.decisionReason && <p className="muted">Decision: {item.decisionReason}</p>}
+            <label className="review-note-input">
+              Reviewer note for next status change
+              <textarea
+                value={reviewNotes[item.id] ?? ''}
+                onChange={(event) => setReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))}
+                placeholder="Add citation, duplicate, or promotion notes before marking this item."
+                rows={3}
+              />
+            </label>
             <div className="review-actions">
               <button type="button" onClick={() => updateStatus(item.id, 'reviewed')}>
                 <Check aria-hidden="true" />

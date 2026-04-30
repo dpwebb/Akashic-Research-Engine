@@ -847,6 +847,23 @@ td span {
   color: #425046;
 }
 
+.review-note-input {
+  display: grid;
+  gap: 6px;
+  color: #425046;
+  font-weight: 800;
+}
+
+.review-note-input textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #bfcbc2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #17201b;
+  background: #fbfdf9;
+}
+
 .review-actions {
   display: flex;
   flex-wrap: wrap;
