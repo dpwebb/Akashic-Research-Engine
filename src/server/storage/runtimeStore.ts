@@ -9,8 +9,18 @@ type RuntimeState = {
 };
 
 const runtimeStatePath = process.env.RUNTIME_STATE_PATH ?? join(process.cwd(), 'runtime-data', 'state.json');
+const runtimeBackupDirectory =
+  process.env.RUNTIME_BACKUP_DIRECTORY ?? join(dirname(runtimeStatePath), 'backups');
+const configuredBackupIntervalMs = Number.parseInt(process.env.RUNTIME_BACKUP_INTERVAL_MS ?? '', 10);
+const runtimeBackupIntervalMs =
+  Number.isFinite(configuredBackupIntervalMs) && configuredBackupIntervalMs > 0
+    ? configuredBackupIntervalMs
+    : 3_600_000;
 let state: RuntimeState | null = null;
 let writeChain = Promise.resolve();
+let backupChain = Promise.resolve();
+let backupDirty = false;
+let backupTimer: NodeJS.Timeout | null = null;
 
 export async function loadRuntimeState(): Promise<RuntimeState> {
   if (state) {
@@ -46,7 +56,53 @@ export async function persistRuntimeState(): Promise<void> {
       const temporaryPath = `${runtimeStatePath}.tmp`;
       await writeFile(temporaryPath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
       await rename(temporaryPath, runtimeStatePath);
+      backupDirty = true;
     });
 
   await writeChain;
+}
+
+export function startRuntimeStateBackups(): void {
+  if (backupTimer) {
+    return;
+  }
+
+  backupTimer = setInterval(() => {
+    void backupRuntimeStateIfChanged();
+  }, runtimeBackupIntervalMs);
+  backupTimer.unref?.();
+}
+
+export async function backupRuntimeStateIfChanged(): Promise<void> {
+  if (!state || !backupDirty) {
+    return;
+  }
+
+  backupChain = backupChain
+    .catch(() => undefined)
+    .then(async () => {
+      await writeChain;
+
+      if (!state || !backupDirty) {
+        return;
+      }
+
+      const snapshot = `${JSON.stringify(state, null, 2)}\n`;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupPath = join(runtimeBackupDirectory, `state-${timestamp}.json`);
+      const latestBackupPath = join(runtimeBackupDirectory, 'latest.json');
+
+      await mkdir(runtimeBackupDirectory, { recursive: true });
+      await writeAtomically(backupPath, snapshot);
+      await writeAtomically(latestBackupPath, snapshot);
+      backupDirty = false;
+    });
+
+  await backupChain;
+}
+
+async function writeAtomically(path: string, content: string): Promise<void> {
+  const temporaryPath = `${path}.tmp`;
+  await writeFile(temporaryPath, content, 'utf8');
+  await rename(temporaryPath, path);
 }

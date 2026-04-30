@@ -9,7 +9,7 @@ import { generateResearchAssistantOutput } from './src/server/openai/researchAss
 import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
 import { previewSourceImport } from './src/server/importing/sourceImport.js';
 import { rateLimit } from './src/server/security/rateLimit.js';
-import { loadRuntimeState, persistRuntimeState } from './src/server/storage/runtimeStore.js';
+import { loadRuntimeState, persistRuntimeState, startRuntimeStateBackups } from './src/server/storage/runtimeStore.js';
 import { researchDataset } from './src/shared/researchData.js';
 import { seedPacks } from './src/shared/seedData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications, type SourceClassification } from './src/shared/taxonomy.js';
@@ -22,6 +22,7 @@ const app = new Hono();
 const runtimeState = await loadRuntimeState();
 const reviewQueue = runtimeState.reviewQueue;
 const ingestionJobs = runtimeState.ingestionJobs;
+startRuntimeStateBackups();
 
 app.use('/api/*', logger());
 app.use('/api/source-import/preview', rateLimit('source-import-preview', { windowMs: 60_000, maxRequests: 12 }));
