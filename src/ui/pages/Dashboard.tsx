@@ -128,6 +128,7 @@ function getIndexRecordCount() {
     researchDataset.index.people.length +
     researchDataset.index.movements.length +
     researchDataset.index.terms.length +
+    researchDataset.index.comparativeConcepts.length +
     researchDataset.index.timeline.length +
     researchDataset.index.bibliography.length
   );

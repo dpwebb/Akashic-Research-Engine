@@ -239,6 +239,38 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
       discoveredAt: new Date().toISOString(),
     } satisfies DiscoverySearchResult;
   });
+  const comparativeConceptMatches: DiscoverySearchResult[] = researchDataset.index.comparativeConcepts.map((concept) => {
+    const score = scoreText(
+      [
+        concept.concept,
+        concept.tradition,
+        concept.relationshipToAkashicResearch,
+        concept.summary,
+        concept.boundaryNote,
+      ].join(' '),
+      request,
+    );
+
+    return {
+      id: `engine-comparative-${concept.id}`,
+      origin: 'engine',
+      category: 'comparative concept',
+      title: concept.concept,
+      url: '',
+      domain: 'engine corpus',
+      snippet: concept.summary,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      confidenceLevel: concept.confidenceLevel,
+      researchNotes: [
+        `Relationship: ${concept.relationshipToAkashicResearch}`,
+        concept.boundaryNote,
+        `Related sources: ${concept.sourceIds.join(', ')}`,
+      ],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
   const timelineMatches: DiscoverySearchResult[] = researchDataset.index.timeline.map((event) => {
     const score = scoreText([event.date, event.title, event.summary, event.entityIds.join(' ')].join(' '), request);
 
@@ -266,8 +298,10 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
         record.author,
         record.publicationDate,
         record.editionNotes,
+        record.publisher,
         record.rightsStatus,
-        record.citation,
+        record.stableCitation,
+        record.pageReference,
         source?.summary,
       ].join(' '),
       request,
@@ -280,13 +314,19 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
       title: record.title,
       url: record.archiveUrl,
       domain: getDomain(record.archiveUrl),
-      snippet: record.citation,
+      snippet: record.stableCitation,
       inspected: true,
       relevanceScore: score.score,
       matchedTerms: score.matchedTerms,
       sourceType: source?.sourceType,
       confidenceLevel: source?.confidenceLevel ?? 'medium',
-      researchNotes: [`Source ID: ${record.sourceId}`, record.editionNotes, `Rights status: ${record.rightsStatus}`],
+      researchNotes: [
+        `Source ID: ${record.sourceId}`,
+        `Publisher: ${record.publisher}`,
+        record.editionNotes,
+        record.pageReference,
+        `Rights status: ${record.rightsStatus}`,
+      ],
       discoveredAt: new Date().toISOString(),
     } satisfies DiscoverySearchResult;
   });
@@ -298,6 +338,7 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
     ...peopleMatches,
     ...movementMatches,
     ...termMatches,
+    ...comparativeConceptMatches,
     ...timelineMatches,
     ...bibliographyMatches,
   ].filter((result) => {

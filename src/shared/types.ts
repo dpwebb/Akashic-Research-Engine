@@ -70,6 +70,7 @@ export type DiscoverySearchResult = {
     | 'person'
     | 'movement'
     | 'term'
+    | 'comparative concept'
     | 'timeline'
     | 'bibliography'
     | 'webpage';
@@ -155,6 +156,17 @@ export type ResearchTerm = {
   sourceIds: string[];
 };
 
+export type ComparativeConcept = {
+  id: string;
+  concept: string;
+  tradition: string;
+  relationshipToAkashicResearch: 'analogue' | 'influence' | 'contrast' | 'speculative comparison';
+  summary: string;
+  boundaryNote: string;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  sourceIds: string[];
+};
+
 export type TimelineEvent = {
   id: string;
   date: string;
@@ -172,7 +184,9 @@ export type BibliographicRecord = {
   author: string;
   publicationDate: string;
   editionNotes: string;
+  publisher: string;
   archiveUrl: string;
   rightsStatus: 'public domain' | 'copyrighted' | 'unknown';
-  citation: string;
+  stableCitation: string;
+  pageReference: string;
 };

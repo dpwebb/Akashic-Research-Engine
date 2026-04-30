@@ -2,6 +2,7 @@ import type {
   AdditionFramework,
   BibliographicRecord,
   Claim,
+  ComparativeConcept,
   GenealogyEdge,
   GenealogyNode,
   ResearchMovement,
@@ -642,6 +643,117 @@ const terms: ResearchTerm[] = [
   },
 ];
 
+const comparativeConcepts: ComparativeConcept[] = [
+  {
+    id: 'astral-light',
+    concept: 'Astral light',
+    tradition: 'Western esoteric and Theosophical vocabulary',
+    relationshipToAkashicResearch: 'influence',
+    summary:
+      'A subtle-medium concept often adjacent to explanations of occult perception, memory, and hidden records in esoteric literature.',
+    boundaryNote:
+      'Do not treat astral light and Akashic Records as interchangeable unless a source explicitly equates them.',
+    confidenceLevel: 'medium',
+    sourceIds: ['blavatsky-secret-doctrine', 'leadbeater-akashic-records'],
+  },
+  {
+    id: 'karma',
+    concept: 'Karma',
+    tradition: 'South Asian religious traditions and Western esoteric reinterpretation',
+    relationshipToAkashicResearch: 'influence',
+    summary:
+      'Karma is often paired with record or soul-history language in modern spiritual interpretations, especially around accountability and life review.',
+    boundaryNote:
+      'Distinguish classical karma doctrines from Western occult record-keeping metaphors.',
+    confidenceLevel: 'medium',
+    sourceIds: ['britannica-akasha-jainism', 'are-akashic-records'],
+  },
+  {
+    id: 'memory-of-nature',
+    concept: 'Memory of nature',
+    tradition: 'Esoteric and occult philosophy',
+    relationshipToAkashicResearch: 'analogue',
+    summary:
+      'A broad occult motif that treats nature or subtle reality as retaining traces of events or consciousness.',
+    boundaryNote:
+      'Use as a motif-level analogue unless tied to a named primary source.',
+    confidenceLevel: 'low',
+    sourceIds: ['theosophy-wiki-akashic-records'],
+  },
+  {
+    id: 'morphic-resonance',
+    concept: 'Morphic resonance',
+    tradition: 'Modern speculative theory',
+    relationshipToAkashicResearch: 'speculative comparison',
+    summary:
+      'A modern hypothesis sometimes compared with field-memory ideas because it uses memory-like language at biological or collective scales.',
+    boundaryNote:
+      'Mark comparisons as speculative; do not cite morphic resonance as proof of Akashic Records.',
+    confidenceLevel: 'low',
+    sourceIds: ['akashic-records-wikipedia'],
+  },
+  {
+    id: 'noosphere',
+    concept: 'Noosphere',
+    tradition: 'Philosophy, theology, and systems thought',
+    relationshipToAkashicResearch: 'analogue',
+    summary:
+      'A concept of a sphere of human thought that can be compared cautiously with collective-information imagery.',
+    boundaryNote:
+      'Noosphere is not an Akashic Records doctrine; keep comparisons conceptual and historically bounded.',
+    confidenceLevel: 'low',
+    sourceIds: ['akashic-records-wikipedia'],
+  },
+  {
+    id: 'collective-memory',
+    concept: 'Collective memory',
+    tradition: 'Sociology and cultural history',
+    relationshipToAkashicResearch: 'contrast',
+    summary:
+      'A social and cultural model for how groups remember, transmit, and reshape the past.',
+    boundaryNote:
+      'Collective memory is sociological, not metaphysical; use it to clarify cultural transmission rather than hidden records.',
+    confidenceLevel: 'medium',
+    sourceIds: ['jung-collective-unconscious'],
+  },
+  {
+    id: 'collective-unconscious-comparison',
+    concept: 'Collective unconscious',
+    tradition: 'Analytical psychology',
+    relationshipToAkashicResearch: 'analogue',
+    summary:
+      'A psychological framework sometimes used as an analogue for transpersonal symbolic patterns.',
+    boundaryNote:
+      'Jungian theory is not equivalent to Akashic Records doctrine and should not be cited as validation.',
+    confidenceLevel: 'medium',
+    sourceIds: ['jung-collective-unconscious'],
+  },
+  {
+    id: 'book-of-life-comparison',
+    concept: 'Book of Life',
+    tradition: 'Biblical and modern spiritual interpretation',
+    relationshipToAkashicResearch: 'analogue',
+    summary:
+      'A religious record motif used in Cayce-related explanations and broader comparisons with soul-history ideas.',
+    boundaryNote:
+      'Mark as comparative unless a source explicitly frames it as Akashic Records language.',
+    confidenceLevel: 'medium',
+    sourceIds: ['are-akashic-records'],
+  },
+  {
+    id: 'information-field',
+    concept: 'Information field',
+    tradition: 'Modern metaphysical and speculative vocabulary',
+    relationshipToAkashicResearch: 'speculative comparison',
+    summary:
+      'A contemporary metaphor that reframes Akashic Records as a field or database-like persistence of information.',
+    boundaryNote:
+      'Treat as speculative metaphor, not physics or empirical evidence.',
+    confidenceLevel: 'medium',
+    sourceIds: ['akashic-records-wikipedia', 'cayce-personal-growth'],
+  },
+];
+
 const timeline: TimelineEvent[] = [
   {
     id: 'event-1881-olcott',
@@ -724,15 +836,45 @@ const bibliography: BibliographicRecord[] = sources.map((source) => ({
   author: source.author,
   publicationDate: source.date,
   editionNotes: source.date === 'reference article' || source.date === 'reference entry' ? 'Online reference entry' : 'Edition details require review',
+  publisher: inferPublisher(source.url, source.author),
   archiveUrl: source.url,
   rightsStatus: source.url.includes('archive.org') || Number.parseInt(source.date, 10) < 1929 ? 'public domain' : 'unknown',
-  citation: `${source.author}. ${source.title}. ${source.date}. ${source.url}`,
+  stableCitation: `${source.author}. ${source.title}. ${source.date}. ${source.url}`,
+  pageReference: 'page/chapter reference pending review',
 }));
+
+function inferPublisher(url: string, author: string): string {
+  if (url.includes('archive.org')) {
+    return 'Internet Archive scan';
+  }
+
+  if (url.includes('britannica.com')) {
+    return 'Encyclopaedia Britannica';
+  }
+
+  if (url.includes('encyclopedia.com')) {
+    return 'Encyclopedia.com';
+  }
+
+  if (url.includes('rsarchive.org')) {
+    return 'Rudolf Steiner Archive';
+  }
+
+  if (url.includes('edgarcayce.org')) {
+    return 'Edgar Cayce A.R.E.';
+  }
+
+  if (url.includes('wikipedia.org')) {
+    return 'Wikipedia';
+  }
+
+  return author;
+}
 
 export const researchDataset = {
   sources,
   claims,
   genealogy: { nodes, edges },
-  index: { people, movements, terms, timeline, bibliography },
+  index: { people, movements, terms, comparativeConcepts, timeline, bibliography },
   additionFrameworks,
 };

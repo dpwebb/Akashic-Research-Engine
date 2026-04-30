@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, CalendarDays, Network, Search, UserRound } from 'lucide-react';
+import { BookOpen, CalendarDays, GitCompare, Network, Search, UserRound } from 'lucide-react';
 import { researchDataset } from '../../shared/researchData.js';
 
-type IndexTab = 'people' | 'movements' | 'terms' | 'timeline' | 'bibliography';
+type IndexTab = 'people' | 'movements' | 'terms' | 'comparisons' | 'timeline' | 'bibliography';
 
 const tabs: Array<{ id: IndexTab; label: string; icon: typeof UserRound }> = [
   { id: 'people', label: 'People', icon: UserRound },
   { id: 'movements', label: 'Movements', icon: Network },
   { id: 'terms', label: 'Terms', icon: Search },
+  { id: 'comparisons', label: 'Comparisons', icon: GitCompare },
   { id: 'timeline', label: 'Timeline', icon: CalendarDays },
   { id: 'bibliography', label: 'Bibliography', icon: BookOpen },
 ];
@@ -34,6 +35,18 @@ export function ResearchIndexPage() {
       terms: index.terms.filter((term) =>
         includesQuery([term.term, term.aliases, term.tradition, term.definition, term.caution], normalizedQuery),
       ),
+      comparisons: index.comparativeConcepts.filter((concept) =>
+        includesQuery(
+          [
+            concept.concept,
+            concept.tradition,
+            concept.relationshipToAkashicResearch,
+            concept.summary,
+            concept.boundaryNote,
+          ],
+          normalizedQuery,
+        ),
+      ),
       timeline: index.timeline.filter((event) =>
         includesQuery([event.date, event.title, event.summary, event.entityIds], normalizedQuery),
       ),
@@ -44,8 +57,10 @@ export function ResearchIndexPage() {
             record.author,
             record.publicationDate,
             record.editionNotes,
+            record.publisher,
             record.rightsStatus,
-            record.citation,
+            record.stableCitation,
+            record.pageReference,
           ],
           normalizedQuery,
         ),
@@ -59,7 +74,7 @@ export function ResearchIndexPage() {
       <header className="page-header compact">
         <p className="eyebrow">Research hub index</p>
         <h1>Knowledge Index</h1>
-        <p>Browse the structured people, movements, terms, timeline events, and bibliography behind the corpus.</p>
+        <p>Browse the structured people, movements, terms, comparisons, timeline events, and bibliography behind the corpus.</p>
       </header>
 
       <div className="index-toolbar">
@@ -132,6 +147,21 @@ export function ResearchIndexPage() {
         </div>
       )}
 
+      {activeTab === 'comparisons' && (
+        <div className="source-list">
+          {filtered.comparisons.map((concept) => (
+            <article className="index-card timeline-record" key={concept.id}>
+              <span className="tag">{concept.relationshipToAkashicResearch}</span>
+              <h2>{concept.concept}</h2>
+              <p className="muted">{concept.tradition}</p>
+              <p>{concept.summary}</p>
+              <p className="notes">{concept.boundaryNote}</p>
+              <p className="matched-terms">Sources: {concept.sourceIds.join(', ')}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
       {activeTab === 'timeline' && (
         <div className="source-list">
           {filtered.timeline.map((event) => (
@@ -155,7 +185,9 @@ export function ResearchIndexPage() {
                 {record.author} · {record.publicationDate}
               </p>
               <p>{record.editionNotes}</p>
-              <p className="notes">{record.citation}</p>
+              <p className="muted">Publisher: {record.publisher}</p>
+              <p className="notes">{record.stableCitation}</p>
+              <p className="muted">{record.pageReference}</p>
               <a href={record.archiveUrl} target="_blank" rel="noreferrer">
                 Open record
               </a>
