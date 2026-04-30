@@ -45,3 +45,5 @@ Browser code must never receive secret keys. Only publishable keys, such as a St
 ## Akashic Research Engine
 
 Akashic now loads `.env.production` on Hostinger and exposes `/api/integrations` to report which providers are configured by name only. It does not expose secret values.
+
+Use `gpt-5-mini` as the default OpenAI model for these apps unless an app has confirmed access to a newer model.

@@ -57,9 +57,22 @@ const assistantRequestSchema = z.object({
 });
 
 app.post('/api/assistant/generate', async (c) => {
-  const input = assistantRequestSchema.parse(await c.req.json());
-  const output = await generateResearchAssistantOutput(input);
-  return c.json(output);
+  try {
+    const input = assistantRequestSchema.parse(await c.req.json());
+    const output = await generateResearchAssistantOutput(input);
+    return c.json(output);
+  } catch (error) {
+    console.error('[Assistant Generate]', error);
+    return c.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Assistant generation failed. Check provider configuration and model access.',
+      },
+      500,
+    );
+  }
 });
 
 app.get('/api/addition-builder/frameworks', (c) => c.json(researchDataset.additionFrameworks));
