@@ -35,7 +35,10 @@ export type GenealogyEdge = {
   from: string;
   to: string;
   label: string;
+  relationshipKind: 'term inheritance' | 'doctrinal influence' | 'reinterpretation' | 'parallel concept' | 'disputed link';
   confidence: 'high' | 'medium' | 'low';
+  sourceIds: string[];
+  auditNote: string;
 };
 
 export type AdditionFramework = {

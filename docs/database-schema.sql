@@ -147,7 +147,10 @@ create table genealogy_edges (
   from_node_id text not null references genealogy_nodes(id) on delete cascade,
   to_node_id text not null references genealogy_nodes(id) on delete cascade,
   label text not null,
-  confidence text not null check (confidence in ('high', 'medium', 'low'))
+  relationship_kind text not null default '',
+  confidence text not null check (confidence in ('high', 'medium', 'low')),
+  source_ids text[] not null default '{}',
+  audit_note text not null default ''
 );
 
 create table ingestion_jobs (

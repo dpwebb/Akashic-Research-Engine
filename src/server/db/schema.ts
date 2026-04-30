@@ -164,7 +164,10 @@ export type GenealogyEdgeTable = {
   from_node_id: string;
   to_node_id: string;
   label: string;
+  relationship_kind: string;
   confidence: string;
+  source_ids: string[];
+  audit_note: string;
 };
 
 export type AssistantOutputTable = {

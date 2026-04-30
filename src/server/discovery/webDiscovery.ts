@@ -175,6 +175,36 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
       discoveredAt: new Date().toISOString(),
     } satisfies DiscoverySearchResult;
   });
+  const genealogyEdgeMatches: DiscoverySearchResult[] = researchDataset.genealogy.edges.map((edge) => {
+    const fromNode = researchDataset.genealogy.nodes.find((node) => node.id === edge.from);
+    const toNode = researchDataset.genealogy.nodes.find((node) => node.id === edge.to);
+    const text = [
+      fromNode?.label,
+      toNode?.label,
+      edge.label,
+      edge.relationshipKind,
+      edge.confidence,
+      edge.sourceIds.join(' '),
+      edge.auditNote,
+    ].join(' ');
+    const score = scoreText(text, request);
+
+    return {
+      id: `engine-genealogy-edge-${edge.from}-${edge.to}`,
+      origin: 'engine',
+      category: 'genealogy',
+      title: `${fromNode?.label ?? edge.from} - ${toNode?.label ?? edge.to}`,
+      url: '',
+      domain: 'engine corpus',
+      snippet: `${edge.relationshipKind}. ${edge.label}`,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      confidenceLevel: edge.confidence,
+      researchNotes: [`Sources: ${edge.sourceIds.join(', ')}`, edge.auditNote],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
 
   const peopleMatches: DiscoverySearchResult[] = researchDataset.index.people.map((person) => {
     const score = scoreText(
@@ -348,6 +378,7 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
     ...sourceMatches,
     ...claimMatches,
     ...genealogyMatches,
+    ...genealogyEdgeMatches,
     ...peopleMatches,
     ...movementMatches,
     ...termMatches,

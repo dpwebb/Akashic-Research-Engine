@@ -644,6 +644,10 @@ td span {
   grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(160px, 220px)) minmax(190px, auto);
 }
 
+.genealogy-filter-panel {
+  grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(150px, 210px));
+}
+
 .index-filter-panel {
   grid-template-columns: minmax(280px, 1fr) repeat(2, minmax(140px, 180px));
 }
@@ -955,6 +959,7 @@ td span {
   .search-summary,
   .filter-panel,
   .claims-filter-panel,
+  .genealogy-filter-panel,
   .source-drilldown-panel,
   .distribution-row {
     grid-template-columns: 1fr;
