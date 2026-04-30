@@ -1,13 +1,59 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { researchDataset } from '../../shared/researchData.js';
-import { claimTypes, evidenceGrades, type ClaimType, type EvidenceGrade } from '../../shared/taxonomy.js';
+import {
+  claimTypes,
+  evidenceGrades,
+  sourceClassifications,
+  type ClaimType,
+  type EvidenceGrade,
+  type SourceClassification,
+} from '../../shared/taxonomy.js';
+
+type ConfidenceFilter = 'all' | 'high' | 'medium' | 'low';
+
+function extractYears(text: string): number[] {
+  return [...text.matchAll(/\b(1[0-9]{3}|20[0-9]{2}|21[0-9]{2})\b/g)].map((match) =>
+    Number.parseInt(match[1], 10),
+  );
+}
+
+function matchesDateRange(text: string, dateFrom: string, dateTo: string): boolean {
+  if (!dateFrom && !dateTo) {
+    return true;
+  }
+
+  const years = extractYears(text);
+  if (years.length === 0) {
+    return false;
+  }
+
+  const from = dateFrom ? Number.parseInt(dateFrom, 10) : Number.NEGATIVE_INFINITY;
+  const to = dateTo ? Number.parseInt(dateTo, 10) : Number.POSITIVE_INFINITY;
+  return years.some((year) => year >= from && year <= to);
+}
+
+function claimReuseGuidance(claim: { evidenceGrade: EvidenceGrade; citationRequired: boolean; type: ClaimType }): string {
+  if (claim.evidenceGrade === 'D' || claim.evidenceGrade === 'E' || claim.evidenceGrade === 'F') {
+    return 'Do not cite as proof; use as testimony, interpretation, or speculation with explicit limits.';
+  }
+
+  if (claim.type === 'metaphysical claim' || claim.type === 'experiential claim') {
+    return 'Cite as a source claim, not as independently verified fact.';
+  }
+
+  return claim.citationRequired ? 'Cite the source before reuse.' : 'Useful as workflow context; verify before final citation.';
+}
 
 export function ClaimsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [claimType, setClaimType] = useState<'all' | ClaimType>('all');
   const [evidenceGrade, setEvidenceGrade] = useState<'all' | EvidenceGrade>('all');
+  const [confidence, setConfidence] = useState<ConfidenceFilter>('all');
+  const [sourceType, setSourceType] = useState<'all' | SourceClassification>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [citationRequiredOnly, setCitationRequiredOnly] = useState(false);
   const sourceId = searchParams.get('sourceId') ?? 'all';
   const selectedSource = sourceId === 'all' ? undefined : researchDataset.sources.find((source) => source.id === sourceId);
@@ -19,7 +65,18 @@ export function ClaimsPage() {
     () =>
       researchDataset.claims.filter((claim) => {
         const source = researchDataset.sources.find((item) => item.id === claim.sourceId);
-        const searchableText = [claim.text, claim.type, claim.notes, source?.title, source?.author, source?.sourceType]
+        const searchableText = [
+          claim.text,
+          claim.type,
+          claim.notes,
+          claim.confidenceLevel,
+          claimReuseGuidance(claim),
+          source?.title,
+          source?.author,
+          source?.date,
+          source?.sourceType,
+          source?.citationNotes,
+        ]
           .join(' ')
           .toLocaleLowerCase();
 
@@ -35,7 +92,19 @@ export function ClaimsPage() {
           return false;
         }
 
+        if (confidence !== 'all' && claim.confidenceLevel !== confidence) {
+          return false;
+        }
+
+        if (sourceType !== 'all' && source?.sourceType !== sourceType) {
+          return false;
+        }
+
         if (sourceId !== 'all' && claim.sourceId !== sourceId) {
+          return false;
+        }
+
+        if (source && !matchesDateRange(source.date, dateFrom, dateTo)) {
           return false;
         }
 
@@ -45,7 +114,7 @@ export function ClaimsPage() {
 
         return true;
       }),
-    [citationRequiredOnly, claimType, evidenceGrade, query, sourceId],
+    [citationRequiredOnly, claimType, confidence, dateFrom, dateTo, evidenceGrade, query, sourceId, sourceType],
   );
 
   const setSourceFilter = (nextSourceId: string) => {
@@ -132,6 +201,44 @@ export function ClaimsPage() {
             ))}
           </select>
         </label>
+        <label>
+          Confidence
+          <select value={confidence} onChange={(event) => setConfidence(event.target.value as ConfidenceFilter)}>
+            <option value="all">All confidence</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+        <label>
+          Source class
+          <select value={sourceType} onChange={(event) => setSourceType(event.target.value as typeof sourceType)}>
+            <option value="all">All classes</option>
+            {sourceClassifications.map((classification) => (
+              <option key={classification} value={classification}>
+                {classification}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Source date from
+          <input
+            type="number"
+            value={dateFrom}
+            onChange={(event) => setDateFrom(event.target.value)}
+            placeholder="1880"
+          />
+        </label>
+        <label>
+          Source date to
+          <input
+            type="number"
+            value={dateTo}
+            onChange={(event) => setDateTo(event.target.value)}
+            placeholder="1920"
+          />
+        </label>
         <label className="check-row">
           <input
             type="checkbox"
@@ -162,6 +269,7 @@ export function ClaimsPage() {
                   <td>
                     <strong>{claim.text}</strong>
                     <span>{claim.notes}</span>
+                    <span className="claim-guidance">{claimReuseGuidance(claim)}</span>
                     {source && (
                       <span>
                         Source:{' '}
