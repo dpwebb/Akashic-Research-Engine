@@ -5,6 +5,7 @@ import type {
   Source,
 } from '../../shared/types.js';
 import { researchDataset } from '../../shared/researchData.js';
+import { safeFetch } from '../security/safeFetch.js';
 
 const searchEndpoint = 'https://html.duckduckgo.com/html/';
 const bingSearchEndpoint = 'https://www.bing.com/search';
@@ -842,7 +843,7 @@ async function fetchWithTimeout(input: string, init: RequestInit): Promise<Respo
   const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
 
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    return await safeFetch(input, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }

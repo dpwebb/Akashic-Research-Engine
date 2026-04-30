@@ -7,8 +7,10 @@ import { getIntegrationStatus } from './src/server/integrations/status.js';
 import { generateResearchAssistantOutput } from './src/server/openai/researchAssistant.js';
 import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
 import { previewSourceImport } from './src/server/importing/sourceImport.js';
+import { rateLimit } from './src/server/security/rateLimit.js';
+import { loadRuntimeState, persistRuntimeState } from './src/server/storage/runtimeStore.js';
 import { researchDataset } from './src/shared/researchData.js';
-import { seedPacks, seedReviewQueue } from './src/shared/seedData.js';
+import { seedPacks } from './src/shared/seedData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications, type SourceClassification } from './src/shared/taxonomy.js';
 import { promptTemplates } from './src/shared/promptTemplates.js';
 import type { IngestionJob, ReviewQueueItem } from './src/shared/types.js';
@@ -16,10 +18,14 @@ import type { IngestionJob, ReviewQueueItem } from './src/shared/types.js';
 const port = Number.parseInt(process.env.PORT ?? '3500', 10);
 const host = process.env.HOST ?? '0.0.0.0';
 const app = new Hono();
-const reviewQueue: ReviewQueueItem[] = [...seedReviewQueue];
-const ingestionJobs: IngestionJob[] = [];
+const runtimeState = await loadRuntimeState();
+const reviewQueue = runtimeState.reviewQueue;
+const ingestionJobs = runtimeState.ingestionJobs;
 
 app.use('/api/*', logger());
+app.use('/api/source-import/preview', rateLimit('source-import-preview', { windowMs: 60_000, maxRequests: 12 }));
+app.use('/api/discovery/search', rateLimit('discovery-search', { windowMs: 60_000, maxRequests: 10 }));
+app.use('/api/assistant/generate', rateLimit('assistant-generate', { windowMs: 60_000, maxRequests: 6 }));
 
 app.get('/api/health', (c) =>
   c.json({
@@ -62,6 +68,23 @@ app.get('/api/assistant/prompts', (c) => c.json(promptTemplates));
 app.get('/api/seed-packs', (c) => c.json(seedPacks));
 
 app.get('/api/review-queue', (c) => c.json(reviewQueue));
+app.get('/api/runtime-summary', (c) =>
+  c.json({
+    reviewQueue: {
+      total: reviewQueue.length,
+      pending: reviewQueue.filter((item) => item.status === 'pending').length,
+      approved: reviewQueue.filter((item) => item.status === 'approved').length,
+      rejected: reviewQueue.filter((item) => item.status === 'rejected').length,
+    },
+    ingestionJobs: {
+      total: ingestionJobs.length,
+      queued: ingestionJobs.filter((job) => job.status === 'queued').length,
+      running: ingestionJobs.filter((job) => job.status === 'running').length,
+      completed: ingestionJobs.filter((job) => job.status === 'completed').length,
+      failed: ingestionJobs.filter((job) => job.status === 'failed').length,
+    },
+  }),
+);
 
 const reviewQueueItemSchema = z.object({
   title: z.string().min(2).max(240),
@@ -98,6 +121,7 @@ app.post('/api/review-queue', async (c) => {
     };
 
     reviewQueue.unshift(item);
+    await persistRuntimeState();
     return c.json(item, 201);
   } catch (error) {
     console.error('[Review Queue Add]', error);
@@ -120,6 +144,7 @@ app.patch('/api/review-queue/:id/status', async (c) => {
   item.status = input.status;
   item.reviewedAt = new Date().toISOString();
   item.reviewerNotes = input.reviewerNotes ?? item.reviewerNotes;
+  await persistRuntimeState();
   return c.json(item);
 });
 
@@ -169,6 +194,7 @@ app.post('/api/ingestion-jobs', async (c) => {
     };
 
     ingestionJobs.unshift(job);
+    await persistRuntimeState();
     return c.json(job, 201);
   } catch (error) {
     console.error('[Ingestion Job Add]', error);

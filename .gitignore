@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-server/
+runtime-data/
 .env
 .env.*
 !.env.example

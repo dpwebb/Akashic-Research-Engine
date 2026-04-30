@@ -1,9 +1,16 @@
 import { AlertTriangle, BookOpenCheck, Database, FileSearch, Inbox, ScrollText } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { researchDataset } from '../../shared/researchData.js';
-import { seedReviewQueue } from '../../shared/seedData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications } from '../../shared/taxonomy.js';
 
+type RuntimeSummary = {
+  reviewQueue: {
+    pending: number;
+  };
+};
+
 export function Dashboard() {
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const sourceCount = researchDataset.sources.length;
   const claimCount = researchDataset.claims.length;
   const speculativeCount = researchDataset.claims.filter((claim) => claim.evidenceGrade === 'E').length;
@@ -14,7 +21,19 @@ export function Dashboard() {
   const citationReviewCount = researchDataset.index.bibliography.filter(
     (record) => record.citationStatus === 'needs review',
   ).length;
-  const pendingReviewCount = seedReviewQueue.filter((item) => item.status === 'pending').length;
+
+  useEffect(() => {
+    async function loadRuntimeSummary() {
+      const response = await fetch('/api/runtime-summary');
+
+      if (response.ok) {
+        const summary = (await response.json()) as RuntimeSummary;
+        setPendingReviewCount(summary.reviewQueue.pending);
+      }
+    }
+
+    void loadRuntimeSummary();
+  }, []);
 
   return (
     <section className="page-stack">

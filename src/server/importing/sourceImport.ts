@@ -1,4 +1,5 @@
 import type { SourceImportPreview } from '../../shared/types.js';
+import { safeFetch } from '../security/safeFetch.js';
 
 const requestTimeoutMs = 9000;
 const maxInspectableBytes = 650_000;
@@ -280,7 +281,7 @@ async function fetchWithTimeout(input: string, init: RequestInit): Promise<Respo
   const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
 
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    return await safeFetch(input, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }
