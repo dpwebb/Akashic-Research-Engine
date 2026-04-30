@@ -2,6 +2,9 @@ import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
+import { z } from 'zod';
+import { getIntegrationStatus } from './src/server/integrations/status.js';
+import { generateResearchAssistantOutput } from './src/server/openai/researchAssistant.js';
 import { researchDataset } from './src/shared/researchData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications } from './src/shared/taxonomy.js';
 import { promptTemplates } from './src/shared/promptTemplates.js';
@@ -19,6 +22,8 @@ app.get('/api/health', (c) =>
     mode: process.env.NODE_ENV ?? 'development',
   }),
 );
+
+app.get('/api/integrations', (c) => c.json(getIntegrationStatus()));
 
 app.get('/api/taxonomy', (c) =>
   c.json({
@@ -45,6 +50,17 @@ app.get('/api/claims', (c) => c.json(researchDataset.claims));
 app.get('/api/genealogy', (c) => c.json(researchDataset.genealogy));
 
 app.get('/api/assistant/prompts', (c) => c.json(promptTemplates));
+
+const assistantRequestSchema = z.object({
+  templateId: z.string().min(1),
+  userInput: z.string().min(10).max(6000),
+});
+
+app.post('/api/assistant/generate', async (c) => {
+  const input = assistantRequestSchema.parse(await c.req.json());
+  const output = await generateResearchAssistantOutput(input);
+  return c.json(output);
+});
 
 app.get('/api/addition-builder/frameworks', (c) => c.json(researchDataset.additionFrameworks));
 

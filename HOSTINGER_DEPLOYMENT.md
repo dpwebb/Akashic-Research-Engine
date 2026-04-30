@@ -34,6 +34,12 @@ database: PostgreSQL planned
 proxy: Traefik with Let's Encrypt
 ```
 
+Runtime secrets:
+
+```text
+env file on VPS: /opt/akashic-research-engine/app/.env.production
+```
+
 ## DNS
 
 Point the domain to the Hostinger VPS:
@@ -143,3 +149,5 @@ Before live persistence or AI generation is enabled, configure:
 
 - `DATABASE_URL`
 - `OPENAI_API_KEY`
+
+See `docs/hostinger-api-access-standard.md` for the shared provider naming rules used across Hostinger apps.

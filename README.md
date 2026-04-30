@@ -20,6 +20,7 @@ This repository is configured for deployment on **Hostinger VPS** with the custo
 - Hono production server at `server.ts`.
 - Shared research taxonomy and seeded dataset in `src/shared/`.
 - Database schema draft in `docs/database-schema.sql`.
+- Shared provider/secret naming standard in `docs/hostinger-api-access-standard.md`.
 - `Dockerfile` and `docker-compose.yml` define the Hostinger Docker/Traefik service.
 
 ## Local Development
