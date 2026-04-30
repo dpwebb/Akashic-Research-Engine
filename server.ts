@@ -117,6 +117,8 @@ const discoverySearchSchema = z.object({
   excludeTerms: z.array(z.string().min(1).max(80)).max(12).default([]),
   domains: z.array(z.string().min(3).max(120)).max(8).default([]),
   sourceTypes: z.array(z.enum(sourceClassifications)).max(8).default([]),
+  evidenceGrades: z.array(z.enum(['A', 'B', 'C', 'D', 'E', 'F'])).max(6).default([]),
+  sourceIds: z.array(z.string().min(1).max(120)).max(24).default([]),
   minRelevance: z.number().int().min(0).max(100).default(0),
 });
 

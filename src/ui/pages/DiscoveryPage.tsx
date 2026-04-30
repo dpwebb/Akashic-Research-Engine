@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { ExternalLink, Filter, Plus, Search } from 'lucide-react';
-import { sourceClassifications, type SourceClassification } from '../../shared/taxonomy.js';
+import { evidenceGrades, sourceClassifications, type EvidenceGrade, type SourceClassification } from '../../shared/taxonomy.js';
+import { researchDataset } from '../../shared/researchData.js';
 import type { DiscoverySearchResponse } from '../../shared/types.js';
 
 type SearchScope = 'combined' | 'engine' | 'web';
@@ -22,6 +23,8 @@ export function DiscoveryPage() {
   const [excludeTerms, setExcludeTerms] = useState('course, paid reading');
   const [domains, setDomains] = useState('');
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<SourceClassification[]>([]);
+  const [selectedEvidenceGrades, setSelectedEvidenceGrades] = useState<EvidenceGrade[]>([]);
+  const [selectedSourceId, setSelectedSourceId] = useState('all');
   const [minRelevance, setMinRelevance] = useState(0);
   const [response, setResponse] = useState<DiscoverySearchResponse | null>(null);
   const [error, setError] = useState('');
@@ -39,6 +42,8 @@ export function DiscoveryPage() {
       excludeTerms: parseList(excludeTerms),
       domains: parseList(domains),
       sourceTypes: selectedSourceTypes,
+      evidenceGrades: selectedEvidenceGrades,
+      sourceIds: selectedSourceId === 'all' ? [] : [selectedSourceId],
       minRelevance,
     }),
     [
@@ -51,6 +56,8 @@ export function DiscoveryPage() {
       excludeTerms,
       domains,
       selectedSourceTypes,
+      selectedEvidenceGrades,
+      selectedSourceId,
       minRelevance,
     ],
   );
@@ -86,6 +93,14 @@ export function DiscoveryPage() {
       current.includes(sourceType)
         ? current.filter((item) => item !== sourceType)
         : [...current, sourceType],
+    );
+  }
+
+  function toggleEvidenceGrade(evidenceGrade: EvidenceGrade) {
+    setSelectedEvidenceGrades((current) =>
+      current.includes(evidenceGrade)
+        ? current.filter((item) => item !== evidenceGrade)
+        : [...current, evidenceGrade],
     );
   }
 
@@ -226,6 +241,17 @@ export function DiscoveryPage() {
                 placeholder="Example: archive.org, rsarchive.org"
               />
             </label>
+            <label>
+              Engine source
+              <select value={selectedSourceId} onChange={(event) => setSelectedSourceId(event.target.value)}>
+                <option value="all">All engine sources</option>
+                {researchDataset.sources.map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.title}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <div className="source-type-filter" aria-label="Source classifications">
@@ -237,6 +263,18 @@ export function DiscoveryPage() {
                 onClick={() => toggleSourceType(sourceType)}
               >
                 {sourceType}
+              </button>
+            ))}
+          </div>
+          <div className="source-type-filter" aria-label="Evidence grades">
+            {evidenceGrades.map((grade) => (
+              <button
+                className={selectedEvidenceGrades.includes(grade.grade) ? 'active' : ''}
+                key={grade.grade}
+                type="button"
+                onClick={() => toggleEvidenceGrade(grade.grade)}
+              >
+                Grade {grade.grade}
               </button>
             ))}
           </div>

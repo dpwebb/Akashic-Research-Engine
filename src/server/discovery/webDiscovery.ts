@@ -24,6 +24,8 @@ type NormalizedDiscoverySearchRequest = DiscoverySearchRequest & {
   includeTerms: string[];
   excludeTerms: string[];
   domains: string[];
+  evidenceGrades: Array<'A' | 'B' | 'C' | 'D' | 'E' | 'F'>;
+  sourceIds: string[];
   minRelevance: number;
 };
 
@@ -87,6 +89,8 @@ function normalizeRequest(request: DiscoverySearchRequest): NormalizedDiscoveryS
     excludeTerms: normalizeTerms(request.excludeTerms),
     domains: normalizeTerms(request.domains).map((domain) => domain.replace(/^https?:\/\//, '')),
     sourceTypes: request.sourceTypes ?? [],
+    evidenceGrades: request.evidenceGrades ?? [],
+    sourceIds: request.sourceIds ?? [],
     exactPhrase: request.exactPhrase?.trim(),
     minRelevance: request.minRelevance ?? 0,
   };
@@ -140,6 +144,7 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
       confidenceLevel: claim.confidenceLevel,
       evidenceGrade: claim.evidenceGrade,
       researchNotes: [
+        `Source ID: ${claim.sourceId}`,
         `Claim type: ${claim.type}`,
         claim.citationRequired ? 'Citation required before reuse.' : 'Citation optional by current taxonomy.',
       ],
@@ -167,7 +172,135 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
     } satisfies DiscoverySearchResult;
   });
 
-  return [...sourceMatches, ...claimMatches, ...genealogyMatches].filter((result) => {
+  const peopleMatches: DiscoverySearchResult[] = researchDataset.index.people.map((person) => {
+    const score = scoreText(
+      [person.name, person.lifespan, person.role, person.summary, person.movementIds.join(' ')].join(' '),
+      request,
+    );
+
+    return {
+      id: `engine-person-${person.id}`,
+      origin: 'engine',
+      category: 'person',
+      title: person.name,
+      url: '',
+      domain: 'engine corpus',
+      snippet: `${person.role}. ${person.summary}`,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      confidenceLevel: 'medium',
+      researchNotes: [`Related sources: ${person.sourceIds.join(', ')}`],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
+  const movementMatches: DiscoverySearchResult[] = researchDataset.index.movements.map((movement) => {
+    const score = scoreText(
+      [movement.name, movement.period, movement.classification, movement.summary].join(' '),
+      request,
+    );
+
+    return {
+      id: `engine-movement-${movement.id}`,
+      origin: 'engine',
+      category: 'movement',
+      title: movement.name,
+      url: '',
+      domain: 'engine corpus',
+      snippet: `${movement.period}. ${movement.summary}`,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      sourceType: movement.classification,
+      confidenceLevel: 'medium',
+      researchNotes: [`Related sources: ${movement.sourceIds.join(', ')}`],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
+  const termMatches: DiscoverySearchResult[] = researchDataset.index.terms.map((term) => {
+    const score = scoreText(
+      [term.term, term.aliases.join(' '), term.tradition, term.definition, term.caution].join(' '),
+      request,
+    );
+
+    return {
+      id: `engine-term-${term.id}`,
+      origin: 'engine',
+      category: 'term',
+      title: term.term,
+      url: '',
+      domain: 'engine corpus',
+      snippet: term.definition,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      confidenceLevel: 'medium',
+      researchNotes: [term.caution, `Related sources: ${term.sourceIds.join(', ')}`],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
+  const timelineMatches: DiscoverySearchResult[] = researchDataset.index.timeline.map((event) => {
+    const score = scoreText([event.date, event.title, event.summary, event.entityIds.join(' ')].join(' '), request);
+
+    return {
+      id: `engine-timeline-${event.id}`,
+      origin: 'engine',
+      category: 'timeline',
+      title: event.title,
+      url: '',
+      domain: 'engine corpus',
+      snippet: `${event.date}. ${event.summary}`,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      confidenceLevel: event.confidenceLevel,
+      researchNotes: [`Related sources: ${event.sourceIds.join(', ')}`],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
+  const bibliographyMatches: DiscoverySearchResult[] = researchDataset.index.bibliography.map((record) => {
+    const source = researchDataset.sources.find((item) => item.id === record.sourceId);
+    const score = scoreText(
+      [
+        record.title,
+        record.author,
+        record.publicationDate,
+        record.editionNotes,
+        record.rightsStatus,
+        record.citation,
+        source?.summary,
+      ].join(' '),
+      request,
+    );
+
+    return {
+      id: `engine-bibliography-${record.id}`,
+      origin: 'engine',
+      category: 'bibliography',
+      title: record.title,
+      url: record.archiveUrl,
+      domain: getDomain(record.archiveUrl),
+      snippet: record.citation,
+      inspected: true,
+      relevanceScore: score.score,
+      matchedTerms: score.matchedTerms,
+      sourceType: source?.sourceType,
+      confidenceLevel: source?.confidenceLevel ?? 'medium',
+      researchNotes: [`Source ID: ${record.sourceId}`, record.editionNotes, `Rights status: ${record.rightsStatus}`],
+      discoveredAt: new Date().toISOString(),
+    } satisfies DiscoverySearchResult;
+  });
+
+  return [
+    ...sourceMatches,
+    ...claimMatches,
+    ...genealogyMatches,
+    ...peopleMatches,
+    ...movementMatches,
+    ...termMatches,
+    ...timelineMatches,
+    ...bibliographyMatches,
+  ].filter((result) => {
     if (result.relevanceScore <= 0) {
       return false;
     }
@@ -195,7 +328,7 @@ function scoreSource(source: Source, request: NormalizedDiscoverySearchRequest):
     matchedTerms: score.matchedTerms,
     sourceType: source.sourceType,
     confidenceLevel: source.confidenceLevel,
-    researchNotes: [source.citationNotes, `Author/date: ${source.author}, ${source.date}`],
+    researchNotes: [`Source ID: ${source.id}`, source.citationNotes, `Author/date: ${source.author}, ${source.date}`],
     discoveredAt: new Date().toISOString(),
   };
 }
@@ -495,6 +628,18 @@ function passesGranularFilters(
   }
 
   if (request.sourceTypes?.length && result.sourceType && !request.sourceTypes.includes(result.sourceType)) {
+    return false;
+  }
+
+  if (request.evidenceGrades.length && result.category !== 'claim') {
+    return false;
+  }
+
+  if (request.evidenceGrades.length && result.evidenceGrade && !request.evidenceGrades.includes(result.evidenceGrade)) {
+    return false;
+  }
+
+  if (request.sourceIds.length && !request.sourceIds.some((sourceId) => searchableText.includes(sourceId))) {
     return false;
   }
 

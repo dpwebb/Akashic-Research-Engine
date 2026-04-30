@@ -55,13 +55,24 @@ export type DiscoverySearchRequest = {
   excludeTerms?: string[];
   domains?: string[];
   sourceTypes?: SourceClassification[];
+  evidenceGrades?: EvidenceGrade[];
+  sourceIds?: string[];
   minRelevance?: number;
 };
 
 export type DiscoverySearchResult = {
   id: string;
   origin: 'engine' | 'web';
-  category: 'source' | 'claim' | 'genealogy' | 'webpage';
+  category:
+    | 'source'
+    | 'claim'
+    | 'genealogy'
+    | 'person'
+    | 'movement'
+    | 'term'
+    | 'timeline'
+    | 'bibliography'
+    | 'webpage';
   title: string;
   url: string;
   domain: string;
