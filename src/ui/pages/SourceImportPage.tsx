@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { ExternalLink, Import, Plus } from 'lucide-react';
-import type { IngestionJob, SourceImportPreview } from '../../shared/types.js';
+import { ExternalLink, GitMerge, Import, Plus } from 'lucide-react';
+import type { DuplicateCandidate, IngestionJob, SourceImportPreview } from '../../shared/types.js';
 
 export function SourceImportPage() {
   const [url, setUrl] = useState('https://www.britannica.com/topic/Akashic-record');
@@ -85,6 +85,11 @@ export function SourceImportPage() {
             ? [
                 `Import metadata: ${preview.wordCount.toLocaleString()} words, ${preview.characterCount.toLocaleString()} characters, citation ${preview.citationStatus}, author ${preview.detectedAuthor || 'pending'}, date ${preview.detectedDate || 'pending'}.`,
                 `Quality flags: ${preview.qualityFlags.join(' | ') || 'none'}.`,
+                preview.duplicateCandidates.length > 0
+                  ? `Duplicate candidates: ${preview.duplicateCandidates
+                      .map((candidate) => `${candidate.confidenceScore}% ${candidate.matchKind} ${candidate.title}`)
+                      .join(' | ')}.`
+                  : 'Duplicate candidates: none.',
                 `Import excerpt captured for review: ${preview.textExcerpt.slice(0, 500)}`,
               ].join('\n')
             : 'No text excerpt captured.',
@@ -128,6 +133,9 @@ export function SourceImportPage() {
             `Content type: ${preview.contentType}.`,
             `Detected author: ${preview.detectedAuthor || 'pending review'}.`,
             `Detected date: ${preview.detectedDate || 'pending review'}.`,
+            preview.duplicateCandidates.length > 0
+              ? `Duplicate candidates: ${preview.duplicateCandidates.length}.`
+              : 'No duplicate candidates detected.',
             preview.fullTextCandidate ? 'Preview marked as a full-text candidate.' : 'Preview did not meet full-text candidate thresholds.',
           ].join(' '),
         }),
@@ -194,9 +202,24 @@ export function SourceImportPage() {
             <MetadataItem label="Content type" value={preview.contentType} />
             <MetadataItem label="Detected author" value={preview.detectedAuthor || 'pending review'} />
             <MetadataItem label="Detected date" value={preview.detectedDate || 'pending review'} />
+            <MetadataItem label="Canonical URL" value={preview.canonicalUrl} />
+            <MetadataItem label="Fingerprint" value={preview.sourceFingerprint} />
             <MetadataItem label="Words" value={preview.wordCount.toLocaleString()} />
             <MetadataItem label="Characters" value={preview.characterCount.toLocaleString()} />
           </div>
+          {preview.duplicateCandidates.length > 0 && (
+            <div className="panel compact-panel duplicate-panel">
+              <h3>
+                <GitMerge aria-hidden="true" />
+                Duplicate Candidates
+              </h3>
+              <div className="duplicate-list">
+                {preview.duplicateCandidates.map((candidate) => (
+                  <DuplicateCandidateCard candidate={candidate} key={candidate.id} />
+                ))}
+              </div>
+            </div>
+          )}
           {preview.warnings.length > 0 && (
             <div className="panel compact-panel">
               <h3>Warnings</h3>
@@ -258,6 +281,12 @@ export function SourceImportPage() {
                   {job.domain} - {job.wordCount.toLocaleString()} preview words
                 </p>
                 <p>{job.extractionNotes}</p>
+                {job.canonicalUrl && <p className="matched-terms">Canonical URL: {job.canonicalUrl}</p>}
+                {job.duplicateCandidates && job.duplicateCandidates.length > 0 && (
+                  <p className="notes">
+                    Duplicate candidates: {job.duplicateCandidates.map((candidate) => candidate.title).join(' | ')}
+                  </p>
+                )}
                 {job.qualityFlags.length > 0 && <p className="notes">{job.qualityFlags.join(' ')}</p>}
                 <a href={job.url} target="_blank" rel="noreferrer">
                   Open source <ExternalLink aria-hidden="true" />
@@ -268,6 +297,26 @@ export function SourceImportPage() {
         )}
       </section>
     </section>
+  );
+}
+
+function DuplicateCandidateCard({ candidate }: { candidate: DuplicateCandidate }) {
+  return (
+    <article className="duplicate-candidate">
+      <div className="result-meta">
+        <span className="tag">{candidate.confidenceScore}%</span>
+        <span className="tag">{candidate.matchKind.replaceAll('_', ' ')}</span>
+        <span className="tag">{candidate.origin}</span>
+        {candidate.sourceType && <span className="tag">{candidate.sourceType}</span>}
+      </div>
+      <h4>{candidate.title}</h4>
+      <p className="muted">{candidate.domain}</p>
+      <p>{candidate.reason}</p>
+      <p className="matched-terms">Recommended action: {candidate.recommendedAction}</p>
+      <a href={candidate.url} target="_blank" rel="noreferrer">
+        Open candidate <ExternalLink aria-hidden="true" />
+      </a>
+    </article>
   );
 }
 

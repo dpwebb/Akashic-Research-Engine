@@ -8,6 +8,12 @@ import { BillingConfigurationError, createStripeCheckoutSession, getBillingPlanO
 import { generateResearchAssistantOutput } from './src/server/openai/researchAssistant.js';
 import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
 import { previewSourceImport } from './src/server/importing/sourceImport.js';
+import {
+  createSourceFingerprint,
+  findDuplicateSourceCandidates,
+  getSourceDomain,
+  normalizeSourceUrl,
+} from './src/server/deduplication/sourceDuplicates.js';
 import { rateLimit } from './src/server/security/rateLimit.js';
 import { loadRuntimeState, persistRuntimeState, startRuntimeStateBackups } from './src/server/storage/runtimeStore.js';
 import { researchDataset } from './src/shared/researchData.js';
@@ -135,20 +141,50 @@ const reviewQueueItemSchema = z.object({
 app.post('/api/review-queue', async (c) => {
   try {
     const input = reviewQueueItemSchema.parse(await c.req.json());
-    const existing = reviewQueue.find((item) => item.url === input.url);
+    const canonicalUrl = normalizeSourceUrl(input.url);
+    const sourceFingerprint = createSourceFingerprint({
+      title: input.title,
+      url: canonicalUrl,
+      domain: input.domain,
+    });
+    const duplicateCandidates = findDuplicateSourceCandidates(
+      {
+        title: input.title,
+        url: input.url,
+        domain: input.domain,
+        sourceFingerprint,
+      },
+      { reviewQueue, ingestionJobs },
+    );
+    const existing = reviewQueue.find((item) => getCanonicalQueueUrl(item) === canonicalUrl);
 
     if (existing) {
       return c.json(existing);
     }
 
+    const qualityFlags = appendUnique(
+      input.qualityFlags ?? inferReviewQualityFlags(input.proposedSourceType, input.citationNotes),
+      duplicateCandidates.length > 0 ? ['possible duplicate source'] : [],
+      12,
+    );
+    const requiredActions = appendUnique(
+      input.requiredActions ?? inferRequiredActions(input.proposedSourceType),
+      duplicateCandidates.length > 0 ? ['Resolve duplicate candidates before source promotion'] : [],
+      12,
+    );
+
     const item: ReviewQueueItem = {
       id: `discovery-${Date.now()}-${slugify(input.url)}`,
       ...input,
+      canonicalUrl,
+      sourceFingerprint,
+      domain: input.domain || getSourceDomain(input.url),
       reviewPriority: input.reviewPriority ?? inferReviewPriority(input.proposedSourceType, input.confidenceLevel),
-      qualityFlags: input.qualityFlags ?? inferReviewQualityFlags(input.proposedSourceType, input.citationNotes),
-      requiredActions: input.requiredActions ?? inferRequiredActions(input.proposedSourceType),
+      qualityFlags,
+      requiredActions,
       provenance: 'discovery search',
       status: 'pending',
+      duplicateCandidates,
       discoveredAt: new Date().toISOString(),
     };
 
@@ -212,7 +248,22 @@ const ingestionJobSchema = z.object({
 app.post('/api/ingestion-jobs', async (c) => {
   try {
     const input = ingestionJobSchema.parse(await c.req.json());
-    const existing = ingestionJobs.find((job) => job.url === input.url && job.status !== 'failed');
+    const canonicalUrl = normalizeSourceUrl(input.url);
+    const sourceFingerprint = createSourceFingerprint({
+      title: input.title,
+      url: canonicalUrl,
+      domain: input.domain,
+    });
+    const duplicateCandidates = findDuplicateSourceCandidates(
+      {
+        title: input.title,
+        url: input.url,
+        domain: input.domain,
+        sourceFingerprint,
+      },
+      { reviewQueue, ingestionJobs },
+    );
+    const existing = ingestionJobs.find((job) => getCanonicalJobUrl(job) === canonicalUrl && job.status !== 'failed');
 
     if (existing) {
       return c.json(existing);
@@ -221,6 +272,14 @@ app.post('/api/ingestion-jobs', async (c) => {
     const job: IngestionJob = {
       id: `ingestion-${Date.now()}-${slugify(input.url)}`,
       ...input,
+      canonicalUrl,
+      sourceFingerprint,
+      duplicateCandidates,
+      qualityFlags: appendUnique(
+        input.qualityFlags,
+        duplicateCandidates.length > 0 ? ['Possible duplicate candidates need reviewer resolution.'] : [],
+        12,
+      ),
       status: 'queued',
       createdAt: new Date().toISOString(),
     };
@@ -340,6 +399,28 @@ function inferRequiredActions(sourceType: SourceClassification): string[] {
   }
 
   return ['Verify author, publisher, date, and stable URL', 'Record citation-ready page or section reference'];
+}
+
+function getCanonicalQueueUrl(item: ReviewQueueItem): string {
+  return item.canonicalUrl ?? normalizeSourceUrl(item.url);
+}
+
+function getCanonicalJobUrl(job: IngestionJob): string {
+  return job.canonicalUrl ?? normalizeSourceUrl(job.url);
+}
+
+function appendUnique(values: string[], additions: string[], maxItems: number): string[] {
+  const normalized = new Set(values.map((value) => value.toLocaleLowerCase()));
+  const output = [...values];
+
+  for (const addition of additions) {
+    if (!normalized.has(addition.toLocaleLowerCase())) {
+      output.push(addition);
+      normalized.add(addition.toLocaleLowerCase());
+    }
+  }
+
+  return output.slice(0, maxItems);
 }
 
 function getApplicationOrigin(c: Context): string {

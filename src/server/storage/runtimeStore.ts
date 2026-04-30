@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { IngestionJob, ReviewQueueItem } from '../../shared/types.js';
 import { seedReviewQueue } from '../../shared/seedData.js';
+import { createSourceFingerprint, normalizeSourceUrl } from '../deduplication/sourceDuplicates.js';
 
 type RuntimeState = {
   reviewQueue: ReviewQueueItem[];
@@ -30,12 +31,12 @@ export async function loadRuntimeState(): Promise<RuntimeState> {
   try {
     const rawState = JSON.parse(await readFile(runtimeStatePath, 'utf8')) as Partial<RuntimeState>;
     state = {
-      reviewQueue: Array.isArray(rawState.reviewQueue) ? rawState.reviewQueue : [...seedReviewQueue],
-      ingestionJobs: Array.isArray(rawState.ingestionJobs) ? rawState.ingestionJobs : [],
+      reviewQueue: normalizeReviewQueueItems(Array.isArray(rawState.reviewQueue) ? rawState.reviewQueue : seedReviewQueue),
+      ingestionJobs: normalizeIngestionJobs(Array.isArray(rawState.ingestionJobs) ? rawState.ingestionJobs : []),
     };
   } catch {
     state = {
-      reviewQueue: [...seedReviewQueue],
+      reviewQueue: normalizeReviewQueueItems(seedReviewQueue),
       ingestionJobs: [],
     };
     await persistRuntimeState();
@@ -99,6 +100,48 @@ export async function backupRuntimeStateIfChanged(): Promise<void> {
     });
 
   await backupChain;
+}
+
+function normalizeReviewQueueItems(items: ReviewQueueItem[]): ReviewQueueItem[] {
+  return items.map((item) => {
+    try {
+      const canonicalUrl = item.canonicalUrl ?? normalizeSourceUrl(item.url);
+      return {
+        ...item,
+        canonicalUrl,
+        sourceFingerprint:
+          item.sourceFingerprint ??
+          createSourceFingerprint({
+            title: item.title,
+            url: canonicalUrl,
+            domain: item.domain,
+          }),
+      };
+    } catch {
+      return item;
+    }
+  });
+}
+
+function normalizeIngestionJobs(jobs: IngestionJob[]): IngestionJob[] {
+  return jobs.map((job) => {
+    try {
+      const canonicalUrl = job.canonicalUrl ?? normalizeSourceUrl(job.url);
+      return {
+        ...job,
+        canonicalUrl,
+        sourceFingerprint:
+          job.sourceFingerprint ??
+          createSourceFingerprint({
+            title: job.title,
+            url: canonicalUrl,
+            domain: job.domain,
+          }),
+      };
+    } catch {
+      return job;
+    }
+  });
 }
 
 async function writeAtomically(path: string, content: string): Promise<void> {

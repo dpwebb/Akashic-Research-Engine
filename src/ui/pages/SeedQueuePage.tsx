@@ -210,6 +210,20 @@ export function SeedQueuePage() {
             </div>
             <p>{item.summary}</p>
             <p className="notes">{item.citationNotes}</p>
+            {item.canonicalUrl && <p className="matched-terms">Canonical URL: {item.canonicalUrl}</p>}
+            {item.duplicateCandidates && item.duplicateCandidates.length > 0 && (
+              <div className="review-detail-block">
+                <h3>Duplicate Candidates</h3>
+                <ul>
+                  {item.duplicateCandidates.map((candidate) => (
+                    <li key={candidate.id}>
+                      {candidate.confidenceScore}% {candidate.matchKind.replaceAll('_', ' ')} - {candidate.title} -{' '}
+                      {candidate.recommendedAction}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {item.qualityFlags.length > 0 && (
               <div className="review-detail-block">
                 <h3>Quality Flags</h3>

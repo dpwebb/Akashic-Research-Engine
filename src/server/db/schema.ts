@@ -16,6 +16,8 @@ export type Database = {
   genealogy_edges: GenealogyEdgeTable;
   assistant_outputs: AssistantOutputTable;
   ingestion_jobs: IngestionJobTable;
+  source_aliases: SourceAliasTable;
+  duplicate_reviews: DuplicateReviewTable;
 };
 
 export type ResearchPersonTable = {
@@ -90,6 +92,16 @@ export type SourceClaimLinkTable = {
   reviewer_notes: string;
 };
 
+export type SourceAliasTable = {
+  id: Generated<string>;
+  source_id: string;
+  url: string;
+  canonical_url: string;
+  alias_kind: 'alternate URL' | 'archive mirror' | 'publisher mirror' | 'redirect' | 'duplicate submission';
+  review_note: string;
+  created_at: Generated<Date>;
+};
+
 export type EntitySourceLinkTable = {
   id: Generated<string>;
   entity_type: 'person' | 'movement' | 'term' | 'timeline_event';
@@ -103,6 +115,8 @@ export type ReviewQueueItemTable = {
   id: Generated<string>;
   title: string;
   url: string;
+  canonical_url: string;
+  source_fingerprint: string;
   domain: string;
   proposed_source_type: string;
   summary: string;
@@ -113,9 +127,23 @@ export type ReviewQueueItemTable = {
   citation_notes: string;
   quality_flags: string[];
   required_actions: string[];
+  duplicate_candidates: unknown[];
   reviewer_notes: string;
   discovered_at: Generated<Date>;
   reviewed_at: Date | null;
+};
+
+export type DuplicateReviewTable = {
+  id: Generated<string>;
+  incoming_origin: 'review queue' | 'ingestion job' | 'manual import';
+  incoming_id: string;
+  candidate_origin: string;
+  candidate_id: string;
+  match_kind: string;
+  confidence_score: number;
+  decision: 'merge' | 'link as alternate URL' | 'keep separate edition' | 'reject duplicate';
+  reviewer_notes: string;
+  created_at: Generated<Date>;
 };
 
 export type SourceFullTextTable = {
@@ -134,6 +162,9 @@ export type SourceTable = {
   author: string | null;
   published_date: string | null;
   url: string;
+  canonical_url: string;
+  source_fingerprint: string;
+  content_fingerprint: string;
   source_type: string;
   summary: string;
   confidence_level: string;
@@ -146,6 +177,8 @@ export type ClaimTable = {
   id: Generated<string>;
   source_id: string;
   text: string;
+  normalized_text: string;
+  claim_fingerprint: string;
   claim_type: string;
   evidence_grade: string;
   confidence_level: string;
@@ -185,6 +218,8 @@ export type AssistantOutputTable = {
 export type IngestionJobTable = {
   id: Generated<string>;
   url: string;
+  canonical_url: string;
+  source_fingerprint: string;
   domain: string;
   title: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
@@ -193,6 +228,7 @@ export type IngestionJobTable = {
   word_count: number;
   full_text_candidate: boolean;
   quality_flags: string[];
+  duplicate_candidates: unknown[];
   extraction_notes: string;
   error_message: string | null;
   created_at: Generated<Date>;

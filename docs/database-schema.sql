@@ -4,6 +4,9 @@ create table sources (
   author text,
   published_date text,
   url text not null unique,
+  canonical_url text not null unique,
+  source_fingerprint text not null default '',
+  content_fingerprint text not null default '',
   source_type text not null,
   summary text not null default '',
   confidence_level text not null check (confidence_level in ('high', 'medium', 'low')),
@@ -12,10 +15,23 @@ create table sources (
   updated_at timestamptz not null default now()
 );
 
+create table source_aliases (
+  id uuid primary key default gen_random_uuid(),
+  source_id uuid not null references sources(id) on delete cascade,
+  url text not null,
+  canonical_url text not null,
+  alias_kind text not null default 'alternate URL' check (alias_kind in ('alternate URL', 'archive mirror', 'publisher mirror', 'redirect', 'duplicate submission')),
+  review_note text not null default '',
+  created_at timestamptz not null default now(),
+  unique (source_id, canonical_url)
+);
+
 create table claims (
   id uuid primary key default gen_random_uuid(),
   source_id uuid not null references sources(id) on delete cascade,
   text text not null,
+  normalized_text text not null default '',
+  claim_fingerprint text not null default '',
   claim_type text not null,
   evidence_grade text not null check (evidence_grade in ('A', 'B', 'C', 'D', 'E', 'F')),
   confidence_level text not null check (confidence_level in ('high', 'medium', 'low')),
@@ -23,6 +39,10 @@ create table claims (
   notes text not null default '',
   created_at timestamptz not null default now()
 );
+
+create unique index claims_claim_fingerprint_idx
+  on claims (claim_fingerprint, claim_type)
+  where claim_fingerprint <> '';
 
 create table research_people (
   id text primary key,
@@ -111,6 +131,8 @@ create table review_queue_items (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   url text not null unique,
+  canonical_url text not null default '',
+  source_fingerprint text not null default '',
   domain text not null,
   proposed_source_type text not null,
   summary text not null default '',
@@ -121,9 +143,24 @@ create table review_queue_items (
   citation_notes text not null default '',
   quality_flags text[] not null default '{}',
   required_actions text[] not null default '{}',
+  duplicate_candidates jsonb not null default '[]',
   reviewer_notes text not null default '',
   discovered_at timestamptz not null default now(),
   reviewed_at timestamptz
+);
+
+create table duplicate_reviews (
+  id uuid primary key default gen_random_uuid(),
+  incoming_origin text not null check (incoming_origin in ('review queue', 'ingestion job', 'manual import')),
+  incoming_id text not null,
+  candidate_origin text not null,
+  candidate_id text not null,
+  match_kind text not null,
+  confidence_score integer not null check (confidence_score >= 0 and confidence_score <= 100),
+  decision text not null check (decision in ('merge', 'link as alternate URL', 'keep separate edition', 'reject duplicate')),
+  reviewer_notes text not null default '',
+  created_at timestamptz not null default now(),
+  unique (incoming_origin, incoming_id, candidate_origin, candidate_id)
 );
 
 create table source_full_texts (
@@ -159,6 +196,8 @@ create table genealogy_edges (
 create table ingestion_jobs (
   id uuid primary key default gen_random_uuid(),
   url text not null,
+  canonical_url text not null default '',
+  source_fingerprint text not null default '',
   domain text not null default '',
   title text not null default '',
   status text not null check (status in ('queued', 'running', 'completed', 'failed')),
@@ -167,6 +206,7 @@ create table ingestion_jobs (
   word_count integer not null default 0,
   full_text_candidate boolean not null default false,
   quality_flags text[] not null default '{}',
+  duplicate_candidates jsonb not null default '[]',
   extraction_notes text not null default '',
   error_message text,
   created_at timestamptz not null default now(),

@@ -19,6 +19,7 @@ Build the platform using the Hostinger VPS pattern already used by the other app
 5. AI Research Assistant prompt workflows.
 6. Realistic Addition Builder for disciplined speculation.
 7. Ingestion jobs for source collection and later worker automation.
+8. Duplicate detection for source imports, review queue entries, ingestion jobs, and claim fingerprints.
 
 ## Guardrails
 
@@ -36,3 +37,4 @@ Build the platform using the Hostinger VPS pattern already used by the other app
 4. Add authenticated admin workflows for ingestion.
 5. Add OpenAI API calls behind guardrail validators.
 6. Add graph visualization for the genealogy map.
+7. Persist source aliases and duplicate review decisions in PostgreSQL.

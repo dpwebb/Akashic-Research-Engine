@@ -977,6 +977,45 @@ td span {
   overflow-wrap: anywhere;
 }
 
+.duplicate-panel h3 {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.duplicate-panel h3 svg {
+  width: 18px;
+  height: 18px;
+}
+
+.duplicate-list {
+  display: grid;
+  gap: 10px;
+}
+
+.duplicate-candidate {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  background: #fbfdf9;
+}
+
+.duplicate-candidate h4,
+.duplicate-candidate p {
+  margin-bottom: 0;
+}
+
+.duplicate-candidate a {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  width: fit-content;
+  color: #204b39;
+  font-weight: 800;
+}
+
 .framework-card svg {
   color: #8a4b24;
 }

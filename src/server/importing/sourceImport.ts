@@ -1,12 +1,20 @@
 import type { SourceImportPreview } from '../../shared/types.js';
+import {
+  createContentFingerprint,
+  createSourceFingerprint,
+  findDuplicateSourceCandidates,
+  getSourceDomain,
+  normalizeSourceUrl,
+} from '../deduplication/sourceDuplicates.js';
 import { safeFetch } from '../security/safeFetch.js';
+import { loadRuntimeState } from '../storage/runtimeStore.js';
 
 const requestTimeoutMs = 9000;
 const maxInspectableBytes = 650_000;
 const userAgent = 'Mozilla/5.0 (compatible; AkashicResearchEngine/1.0; source import preview)';
 
 export async function previewSourceImport(url: string): Promise<SourceImportPreview> {
-  const normalizedUrl = normalizeUrl(url);
+  const normalizedUrl = normalizeSourceUrl(url);
   const warnings: string[] = [];
 
   try {
@@ -31,6 +39,26 @@ export async function previewSourceImport(url: string): Promise<SourceImportPrev
     const detectedAuthor = isHtml ? detectAuthor(body, visibleText) : '';
     const detectedDate = detectDate([body, visibleText].join(' '));
     const wordCount = countWords(visibleText);
+    const domain = getSourceDomain(normalizedUrl);
+    const resolvedTitle = title || getFilenameTitle(normalizedUrl);
+    const sourceFingerprint = createSourceFingerprint({
+      title: resolvedTitle,
+      author: detectedAuthor,
+      date: detectedDate,
+      url: normalizedUrl,
+      domain,
+    });
+    const contentFingerprint = createContentFingerprint(visibleText);
+    const duplicateCandidates = await getDuplicateCandidates({
+      url: normalizedUrl,
+      title: resolvedTitle,
+      author: detectedAuthor,
+      date: detectedDate,
+      domain,
+      textExcerpt: visibleText,
+      sourceFingerprint,
+      contentFingerprint,
+    });
     const proposedSourceType = classifyImportedSource(normalizedUrl, [title, description, visibleText].join(' '));
     const fullTextCandidate = visibleText.length > 3000 || normalizedUrl.includes('archive.org') || normalizedUrl.endsWith('.pdf');
     const citationStatus = inferCitationStatus({
@@ -44,6 +72,7 @@ export async function previewSourceImport(url: string): Promise<SourceImportPrev
       contentType,
       detectedAuthor,
       detectedDate,
+      duplicateCandidatesCount: duplicateCandidates.length,
       fullTextCandidate,
       proposedSourceType,
       wordCount,
@@ -57,10 +86,17 @@ export async function previewSourceImport(url: string): Promise<SourceImportPrev
       warnings.push('No meta description was found; summary should be written manually during review.');
     }
 
+    if (duplicateCandidates.some((candidate) => candidate.confidenceLevel === 'high')) {
+      warnings.push('High-confidence duplicate candidates were found; resolve before promotion.');
+    }
+
     return {
       url: normalizedUrl,
-      domain: getDomain(normalizedUrl),
-      title: title || getFilenameTitle(normalizedUrl),
+      canonicalUrl: normalizedUrl,
+      sourceFingerprint,
+      contentFingerprint,
+      domain,
+      title: resolvedTitle,
       description: description || 'No description detected.',
       contentType: contentType || 'unknown',
       detectedAuthor,
@@ -76,12 +112,25 @@ export async function previewSourceImport(url: string): Promise<SourceImportPrev
       citationNotes: buildCitationNotes(proposedSourceType, normalizedUrl),
       extractionStatus: 'completed',
       warnings,
+      duplicateCandidates,
     };
   } catch (error) {
+    const domain = getSourceDomain(normalizedUrl);
+    const title = getFilenameTitle(normalizedUrl);
+    const sourceFingerprint = createSourceFingerprint({ title, url: normalizedUrl, domain });
+    const duplicateCandidates = await getDuplicateCandidates({
+      url: normalizedUrl,
+      title,
+      domain,
+      sourceFingerprint,
+    });
+
     return {
       url: normalizedUrl,
-      domain: getDomain(normalizedUrl),
-      title: getFilenameTitle(normalizedUrl),
+      canonicalUrl: normalizedUrl,
+      sourceFingerprint,
+      domain,
+      title,
       description: 'Import preview failed.',
       contentType: 'unknown',
       detectedAuthor: '',
@@ -97,18 +146,13 @@ export async function previewSourceImport(url: string): Promise<SourceImportPrev
       citationNotes: 'Preview failed; manually verify source accessibility and citation metadata.',
       extractionStatus: 'failed',
       warnings: [error instanceof Error ? error.message : 'Import preview failed.'],
+      duplicateCandidates,
     };
   }
 }
 
-function normalizeUrl(value: string): string {
-  const trimmed = value.trim();
-  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  return new URL(withProtocol).href;
-}
-
 function classifyImportedSource(url: string, text: string): SourceImportPreview['proposedSourceType'] {
-  const domain = getDomain(url);
+  const domain = getSourceDomain(url);
   const normalizedText = text.toLocaleLowerCase();
 
   if (domain.includes('britannica.com') || domain.includes('encyclopedia.com') || domain.includes('wikipedia.org')) {
@@ -159,7 +203,7 @@ function inferConfidenceLevel(
 }
 
 function buildCitationNotes(sourceType: SourceImportPreview['proposedSourceType'], url: string): string {
-  const domain = getDomain(url);
+  const domain = getSourceDomain(url);
 
   if (sourceType === 'primary esoteric') {
     return `Imported from ${domain}. Treat as primary esoteric testimony; verify edition and page references.`;
@@ -239,6 +283,7 @@ function buildQualityFlags(input: {
   contentType: string;
   detectedAuthor: string;
   detectedDate: string;
+  duplicateCandidatesCount: number;
   fullTextCandidate: boolean;
   proposedSourceType: SourceImportPreview['proposedSourceType'];
   wordCount: number;
@@ -267,6 +312,10 @@ function buildQualityFlags(input: {
 
   if (input.fullTextCandidate) {
     flags.push('Good candidate for a later full-text extraction job.');
+  }
+
+  if (input.duplicateCandidatesCount > 0) {
+    flags.push('Possible duplicate candidates need reviewer resolution.');
   }
 
   if (!input.contentType.includes('text') && !input.contentType.includes('html')) {
@@ -375,10 +424,14 @@ function getFilenameTitle(url: string): string {
   }
 }
 
-function getDomain(url: string): string {
+async function getDuplicateCandidates(input: Parameters<typeof findDuplicateSourceCandidates>[0]) {
   try {
-    return new URL(url).hostname.replace(/^www\./, '');
+    const runtimeState = await loadRuntimeState();
+    return findDuplicateSourceCandidates(input, {
+      reviewQueue: runtimeState.reviewQueue,
+      ingestionJobs: runtimeState.ingestionJobs,
+    });
   } catch {
-    return 'unknown domain';
+    return findDuplicateSourceCandidates(input);
   }
 }

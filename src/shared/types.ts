@@ -6,6 +6,8 @@ export type Source = {
   author: string;
   date: string;
   url: string;
+  canonicalUrl?: string;
+  sourceFingerprint?: string;
   sourceType: SourceClassification;
   summary: string;
   confidenceLevel: 'high' | 'medium' | 'low';
@@ -16,6 +18,8 @@ export type Claim = {
   id: string;
   sourceId: string;
   text: string;
+  normalizedText?: string;
+  claimFingerprint?: string;
   type: ClaimType;
   evidenceGrade: EvidenceGrade;
   confidenceLevel: 'high' | 'medium' | 'low';
@@ -120,6 +124,8 @@ export type ReviewQueueItem = {
   id: string;
   title: string;
   url: string;
+  canonicalUrl?: string;
+  sourceFingerprint?: string;
   domain: string;
   proposedSourceType: SourceClassification;
   summary: string;
@@ -131,6 +137,7 @@ export type ReviewQueueItem = {
   qualityFlags: string[];
   requiredActions: string[];
   discoveredAt: string;
+  duplicateCandidates?: DuplicateCandidate[];
   reviewedAt?: string;
   reviewerNotes?: string;
 };
@@ -210,6 +217,9 @@ export type SourceImportPreviewRequest = {
 
 export type SourceImportPreview = {
   url: string;
+  canonicalUrl: string;
+  sourceFingerprint: string;
+  contentFingerprint?: string;
   domain: string;
   title: string;
   description: string;
@@ -227,11 +237,14 @@ export type SourceImportPreview = {
   citationNotes: string;
   extractionStatus: 'completed' | 'failed';
   warnings: string[];
+  duplicateCandidates: DuplicateCandidate[];
 };
 
 export type IngestionJob = {
   id: string;
   url: string;
+  canonicalUrl?: string;
+  sourceFingerprint?: string;
   domain: string;
   title: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
@@ -241,7 +254,32 @@ export type IngestionJob = {
   fullTextCandidate: boolean;
   qualityFlags: string[];
   extractionNotes: string;
+  duplicateCandidates?: DuplicateCandidate[];
   createdAt: string;
   completedAt?: string;
   errorMessage?: string;
+};
+
+export type DuplicateMatchKind =
+  | 'exact_url_match'
+  | 'canonical_url_match'
+  | 'source_fingerprint_match'
+  | 'content_fingerprint_match'
+  | 'similar_title_same_domain';
+
+export type DuplicateCandidate = {
+  id: string;
+  origin: 'canonical source' | 'bibliographic record' | 'review queue' | 'ingestion job';
+  matchKind: DuplicateMatchKind;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  confidenceScore: number;
+  title: string;
+  url: string;
+  canonicalUrl: string;
+  domain: string;
+  sourceType?: SourceClassification;
+  status?: string;
+  citationStatus?: string;
+  reason: string;
+  recommendedAction: 'merge' | 'link as alternate URL' | 'keep separate edition' | 'reject duplicate';
 };
