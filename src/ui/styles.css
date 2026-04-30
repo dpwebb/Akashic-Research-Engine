@@ -1256,6 +1256,19 @@ td span {
   align-self: start;
 }
 
+.export-preview-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.export-preview-header h2,
+.export-preview-header p {
+  margin-bottom: 0;
+}
+
 .entitlement-panel {
   max-width: 860px;
 }

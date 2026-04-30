@@ -1,4 +1,4 @@
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { Clipboard, Download, FileText, Loader2 } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import type { ExportDeliverable, ExportDeliverableType } from '../../shared/types.js';
 
@@ -38,6 +38,7 @@ export function ExportsPage() {
   const [activeDeliverable, setActiveDeliverable] = useState<ExportDeliverable | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [copyMessage, setCopyMessage] = useState('');
 
   useEffect(() => {
     async function loadExports() {
@@ -76,10 +77,24 @@ export function ExportsPage() {
       setDeliverables((current) => [data, ...current]);
       setActiveDeliverable(data);
       setTitle('');
+      setCopyMessage('');
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : 'Export could not be generated.');
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function copyActiveExport() {
+    if (!activeDeliverable) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(activeDeliverable.content);
+      setCopyMessage('Export copied.');
+    } catch {
+      setCopyMessage('Copy failed; select the preview text manually.');
     }
   }
 
@@ -140,10 +155,39 @@ export function ExportsPage() {
         </section>
 
         <section className="assistant-output export-preview">
-          <h2>{activeDeliverable?.title ?? 'No Export Selected'}</h2>
+          <div className="export-preview-header">
+            <div>
+              <h2>{activeDeliverable?.title ?? 'No Export Selected'}</h2>
+              {activeDeliverable && (
+                <p className="muted">
+                  {activeDeliverable.type} - generated {new Date(activeDeliverable.createdAt).toLocaleString()}
+                </p>
+              )}
+            </div>
+            {activeDeliverable && (
+              <div className="review-actions">
+                <button type="button" onClick={copyActiveExport}>
+                  <Clipboard aria-hidden="true" />
+                  Copy
+                </button>
+                <a
+                  href={`data:text/markdown;charset=utf-8,${encodeURIComponent(activeDeliverable.content)}`}
+                  download={`${slugify(activeDeliverable.title)}.md`}
+                >
+                  <Download aria-hidden="true" />
+                  Download
+                </a>
+              </div>
+            )}
+          </div>
+          {copyMessage && <p className="form-success">{copyMessage}</p>}
           <pre>{activeDeliverable?.content ?? 'Generate an export to preview the markdown deliverable.'}</pre>
         </section>
       </div>
     </section>
   );
+}
+
+function slugify(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'research-export';
 }
