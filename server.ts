@@ -171,8 +171,6 @@ app.get('/api/taxonomy', (c) =>
   }),
 );
 
-
-
 const discoveryScrubSchema = z.object({
   url: z.string().url(),
 });
