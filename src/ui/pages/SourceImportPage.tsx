@@ -1,8 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { ExternalLink, GitMerge, Import, Plus } from 'lucide-react';
 import type { DuplicateCandidate, IngestionJob, SourceImportPreview } from '../../shared/types.js';
+import { useUserAccess } from '../userAccess.js';
 
 export function SourceImportPage() {
+  const { accountHeaders, policy } = useUserAccess();
   const [url, setUrl] = useState('https://www.britannica.com/topic/Akashic-record');
   const [preview, setPreview] = useState<SourceImportPreview | null>(null);
   const [error, setError] = useState('');
@@ -32,7 +34,7 @@ export function SourceImportPage() {
     try {
       const response = await fetch('/api/source-import/preview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({ url }),
       });
       const data = await response.json();
@@ -60,7 +62,7 @@ export function SourceImportPage() {
     try {
       const response = await fetch('/api/review-queue', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({
           title: preview.title,
           author: preview.detectedAuthor || undefined,
@@ -127,7 +129,7 @@ export function SourceImportPage() {
     try {
       const response = await fetch('/api/ingestion-jobs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({
           url: preview.url,
           domain: preview.domain,
@@ -183,10 +185,11 @@ export function SourceImportPage() {
             placeholder="https://example.com/source"
           />
         </label>
-        <button type="submit" disabled={isPreviewing || url.trim().length < 3}>
+        <button type="submit" disabled={!policy.canUseSourceImport || isPreviewing || url.trim().length < 3}>
           <Import aria-hidden="true" />
           {isPreviewing ? 'Previewing...' : 'Preview Source'}
         </button>
+        {!policy.canUseSourceImport && <p className="form-error">Upgrade to Researcher, Studio, or Enterprise to import sources.</p>}
         {error && <p className="form-error">{error}</p>}
         {message && <p className="form-success">{message}</p>}
       </form>

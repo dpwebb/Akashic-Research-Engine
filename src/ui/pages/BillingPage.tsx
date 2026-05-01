@@ -3,6 +3,7 @@ import { Check, CreditCard, Loader2, ShieldCheck } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { monetizationPlans, usageMetricLabels, type MonetizationPlan } from '../../shared/monetization.js';
 import type { AccountEntitlement, AccountPlanId, UsageMetric } from '../../shared/types.js';
+import { useUserAccess } from '../userAccess.js';
 
 type BillingOverview = {
   stripeConfigured: boolean;
@@ -11,11 +12,12 @@ type BillingOverview = {
 
 export function BillingPage() {
   const location = useLocation();
+  const { accountEmail, accountHeaders, account } = useUserAccess();
   const [overview, setOverview] = useState<BillingOverview>({
     stripeConfigured: false,
     plans: monetizationPlans,
   });
-  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerEmail, setCustomerEmail] = useState(accountEmail);
   const [activePlanId, setActivePlanId] = useState('');
   const [entitlement, setEntitlement] = useState<AccountEntitlement | null>(null);
   const [message, setMessage] = useState('');
@@ -48,6 +50,10 @@ export function BillingPage() {
     void loadBillingOverview();
   }, []);
 
+  useEffect(() => {
+    setCustomerEmail(accountEmail);
+  }, [accountEmail]);
+
   async function startCheckout(event: FormEvent<HTMLFormElement>, planId: string) {
     event.preventDefault();
     setError('');
@@ -57,7 +63,7 @@ export function BillingPage() {
     try {
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({
           planId,
           customerEmail: customerEmail.trim() || undefined,
@@ -101,7 +107,7 @@ export function BillingPage() {
 
     const response = await fetch('/api/account/entitlement', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...accountHeaders },
       body: JSON.stringify({ email: customerEmail.trim(), planId, status: 'active' }),
     });
     const data = await response.json();
@@ -132,6 +138,7 @@ export function BillingPage() {
               ? 'Membership checkout is available for paid plans.'
               : 'Paid plans are visible, but checkout requires the existing Stripe secret key to be configured on the server.'}
           </p>
+          {account?.betaTester && <p>Beta tester billing bypass is active; paid workflows remain available without checkout.</p>}
         </div>
       </section>
 

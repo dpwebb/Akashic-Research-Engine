@@ -36,7 +36,7 @@ export function DiscoveryPage() {
   const [scrubUrl, setScrubUrl] = useState('');
   const [scrubResult, setScrubResult] = useState<any | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const { policy, tier } = useUserAccess();
+  const { policy, tier, accountHeaders } = useUserAccess();
 
   const searchPayload = useMemo(
     () => ({
@@ -82,7 +82,7 @@ export function DiscoveryPage() {
     try {
       const searchResponse = await fetch('/api/discovery/search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify(searchPayload),
       });
       const data = await searchResponse.json();
@@ -122,7 +122,7 @@ export function DiscoveryPage() {
     try {
       const saveResponse = await fetch('/api/review-queue', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({
           title: result.pageTitle || result.title,
           url: result.url,
@@ -160,7 +160,7 @@ export function DiscoveryPage() {
     try {
       const response = await fetch('/api/discovery/scrub', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({ url: scrubUrl.trim() }),
       });
       const data = await response.json();

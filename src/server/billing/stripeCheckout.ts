@@ -36,8 +36,8 @@ export async function createStripeCheckoutSession(input: CheckoutInput): Promise
 
   const body = new URLSearchParams();
   body.set('mode', 'subscription');
-  body.set('success_url', `${input.origin}/billing?checkout=success&plan=${encodeURIComponent(plan.id)}`);
-  body.set('cancel_url', `${input.origin}/billing?checkout=cancelled&plan=${encodeURIComponent(plan.id)}`);
+  body.set('success_url', `${input.origin}/app/billing?checkout=success&plan=${encodeURIComponent(plan.id)}`);
+  body.set('cancel_url', `${input.origin}/app/billing?checkout=cancelled&plan=${encodeURIComponent(plan.id)}`);
   body.set('allow_promotion_codes', 'true');
   body.set('billing_address_collection', 'auto');
   body.set('line_items[0][quantity]', '1');

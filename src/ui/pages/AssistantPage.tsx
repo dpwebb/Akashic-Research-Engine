@@ -1,7 +1,9 @@
 import { promptTemplates } from '../../shared/promptTemplates.js';
 import { FormEvent, useState } from 'react';
+import { useUserAccess } from '../userAccess.js';
 
 export function AssistantPage() {
+  const { accountHeaders, policy } = useUserAccess();
   const [templateId, setTemplateId] = useState(promptTemplates[0]?.id ?? '');
   const [userInput, setUserInput] = useState('');
   const [output, setOutput] = useState('');
@@ -17,7 +19,7 @@ export function AssistantPage() {
     try {
       const response = await fetch('/api/assistant/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({ templateId, userInput }),
       });
 
@@ -65,9 +67,10 @@ export function AssistantPage() {
             placeholder="Paste source notes, URLs, claims, or comparison material here."
           />
         </label>
-        <button type="submit" disabled={isGenerating || userInput.trim().length < 10}>
+        <button type="submit" disabled={!policy.canUseAssistant || isGenerating || userInput.trim().length < 10}>
           {isGenerating ? 'Generating...' : 'Generate'}
         </button>
+        {!policy.canUseAssistant && <p className="form-error">Upgrade to Studio or Enterprise to use assistant generation.</p>}
         {error && <p className="form-error">{error}</p>}
       </form>
 

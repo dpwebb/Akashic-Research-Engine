@@ -52,7 +52,7 @@ function SourceLinks({ sourceIds }: { sourceIds: string[] }) {
   return (
     <div className="source-chip-list" aria-label="Linked sources">
       {sourceIds.map((sourceId) => (
-        <Link key={sourceId} to={`/claims?sourceId=${encodeURIComponent(sourceId)}`}>
+        <Link key={sourceId} to={`/app/claims?sourceId=${encodeURIComponent(sourceId)}`}>
           {sourceTitle(sourceId)}
         </Link>
       ))}
@@ -271,7 +271,7 @@ export function ResearchIndexPage() {
               <p className="notes">{record.stableCitation}</p>
               <p className="muted">{record.pageReference}</p>
               <p className="notes">{record.auditNote}</p>
-              <Link to={`/claims?sourceId=${encodeURIComponent(record.sourceId)}`}>View linked claims</Link>
+              <Link to={`/app/claims?sourceId=${encodeURIComponent(record.sourceId)}`}>View linked claims</Link>
               <a href={record.archiveUrl} target="_blank" rel="noreferrer">
                 Open record
               </a>

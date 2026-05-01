@@ -148,7 +148,7 @@ export function ClaimsPage() {
           <div className="source-drilldown-stats">
             <span className="tag">{selectedSourceClaims.length} linked claims</span>
             <span className="tag">{selectedSource.confidenceLevel} source confidence</span>
-            <Link to="/claims">Clear source</Link>
+            <Link to="/app/claims">Clear source</Link>
             <a href={selectedSource.url} target="_blank" rel="noreferrer">
               Open source
             </a>
@@ -273,7 +273,7 @@ export function ClaimsPage() {
                     {source && (
                       <span>
                         Source:{' '}
-                        <Link to={`/claims?sourceId=${encodeURIComponent(source.id)}`}>
+                        <Link to={`/app/claims?sourceId=${encodeURIComponent(source.id)}`}>
                           {source.title} - {source.author}
                         </Link>
                       </span>

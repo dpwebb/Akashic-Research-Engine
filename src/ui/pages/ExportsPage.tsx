@@ -1,6 +1,7 @@
 import { Clipboard, Download, FileText, Loader2 } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import type { ExportDeliverable, ExportDeliverableType } from '../../shared/types.js';
+import { useUserAccess } from '../userAccess.js';
 
 const exportOptions: Array<{ type: ExportDeliverableType; label: string; description: string }> = [
   {
@@ -31,10 +32,11 @@ const exportOptions: Array<{ type: ExportDeliverableType; label: string; descrip
 ];
 
 export function ExportsPage() {
+  const { accountEmail, accountHeaders, policy } = useUserAccess();
   const [deliverables, setDeliverables] = useState<ExportDeliverable[]>([]);
   const [type, setType] = useState<ExportDeliverableType>('citation-packet');
   const [title, setTitle] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(accountEmail);
   const [activeDeliverable, setActiveDeliverable] = useState<ExportDeliverable | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -53,6 +55,10 @@ export function ExportsPage() {
     void loadExports();
   }, []);
 
+  useEffect(() => {
+    setEmail(accountEmail);
+  }, [accountEmail]);
+
   async function generateExport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
@@ -61,7 +67,7 @@ export function ExportsPage() {
     try {
       const response = await fetch('/api/exports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({
           type,
           title: title.trim() || undefined,
@@ -125,10 +131,11 @@ export function ExportsPage() {
           Account email
           <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="researcher@example.com" type="email" />
         </label>
-        <button type="submit" disabled={isGenerating}>
+        <button type="submit" disabled={!policy.canUseExports || isGenerating}>
           {isGenerating ? <Loader2 aria-hidden="true" /> : <Download aria-hidden="true" />}
           {isGenerating ? 'Generating...' : 'Generate Export'}
         </button>
+        {!policy.canUseExports && <p className="form-error">Upgrade to Researcher, Studio, or Enterprise to generate exports.</p>}
         {error && <p className="form-error">{error}</p>}
       </form>
 

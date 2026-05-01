@@ -178,6 +178,8 @@ export type UsageLimits = Record<UsageMetric, number | null>;
 
 export type UsageSnapshot = Record<UsageMetric, number>;
 
+export type UserScope = 'public' | 'free' | 'paid' | 'studio' | 'enterprise' | 'betaTester' | 'admin';
+
 export type AccountEntitlement = {
   email: string;
   planId: AccountPlanId;
@@ -186,6 +188,17 @@ export type AccountEntitlement = {
   stripeSubscriptionId?: string;
   currentPeriodEndsAt?: string;
   usage: UsageSnapshot;
+  updatedAt: string;
+};
+
+export type AccountSession = {
+  email: string;
+  displayName: string;
+  authenticated: boolean;
+  betaTester: boolean;
+  betaFallback: boolean;
+  entitlement: AccountEntitlement;
+  scopes: UserScope[];
   updatedAt: string;
 };
 

@@ -34,11 +34,13 @@ import { monetizationPlans } from './src/shared/monetization.js';
 import type {
   AccountEntitlement,
   AccountPlanId,
+  AccountSession,
   ExportDeliverable,
   ExportDeliverableType,
   IngestionJob,
   PromotedSource,
   ReviewQueueItem,
+  UserScope,
   Source,
   UsageMetric,
 } from './src/shared/types.js';
@@ -53,6 +55,10 @@ const ingestionJobs = runtimeState.ingestionJobs;
 const promotedSources = runtimeState.promotedSources;
 const accountEntitlements = runtimeState.accountEntitlements;
 const exportDeliverables = runtimeState.exportDeliverables;
+const betaTesterEmail = normalizeEmail(process.env.BETA_TESTER_EMAIL || 'beta@akashicresearch.info');
+if (seedBetaTesterAccount()) {
+  await persistRuntimeState();
+}
 startRuntimeStateBackups();
 
 app.use('/api/*', logger());
@@ -129,6 +135,11 @@ app.get('/api/operations/command-center', async (c) =>
 app.get('/api/account/entitlement', (c) => {
   const email = c.req.query('email')?.trim().toLocaleLowerCase();
   return c.json(getEntitlement(email));
+});
+
+app.get('/api/account/session', (c) => {
+  const email = c.req.query('email') ?? c.req.header('x-account-email');
+  return c.json(getAccountSession(email));
 });
 
 const entitlementSchema = z.object({
@@ -717,8 +728,30 @@ function getOperationsActionItems(): string[] {
   return actions;
 }
 
+function getAccountSession(email?: string): AccountSession {
+  const normalizedEmail = normalizeEmail(email);
+  const entitlement = getEntitlement(normalizedEmail || undefined);
+  const betaTester = normalizedEmail === betaTesterEmail;
+  const scopes = getScopesForEntitlement(entitlement, betaTester);
+
+  return {
+    email: entitlement.email,
+    displayName: betaTester ? 'Beta Tester' : getDisplayName(entitlement.email),
+    authenticated: Boolean(normalizedEmail),
+    betaTester,
+    betaFallback: betaTester,
+    entitlement,
+    scopes,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 function getEntitlement(email?: string): AccountEntitlement {
-  const normalizedEmail = email?.trim().toLocaleLowerCase();
+  const normalizedEmail = normalizeEmail(email);
+  if (normalizedEmail === betaTesterEmail) {
+    return upsertEntitlement(normalizedEmail, 'institution-license', 'active');
+  }
+
   const existing = normalizedEmail
     ? accountEntitlements.find((account) => account.email === normalizedEmail)
     : undefined;
@@ -741,24 +774,88 @@ function upsertEntitlement(
   planId: AccountPlanId,
   status: AccountEntitlement['status'],
 ): AccountEntitlement {
-  const normalizedEmail = email.trim().toLocaleLowerCase();
+  const normalizedEmail = normalizeEmail(email);
+  const protectedPlanId: AccountPlanId = normalizedEmail === betaTesterEmail ? 'institution-license' : planId;
+  const protectedStatus: AccountEntitlement['status'] = normalizedEmail === betaTesterEmail ? 'active' : status;
   const existing = accountEntitlements.find((account) => account.email === normalizedEmail);
   if (existing) {
-    existing.planId = planId;
-    existing.status = status;
+    existing.planId = protectedPlanId;
+    existing.status = protectedStatus;
     existing.updatedAt = new Date().toISOString();
     return existing;
   }
 
   const entitlement: AccountEntitlement = {
     email: normalizedEmail,
-    planId,
-    status,
+    planId: protectedPlanId,
+    status: protectedStatus,
     usage: createEmptyUsage(),
     updatedAt: new Date().toISOString(),
   };
   accountEntitlements.unshift(entitlement);
   return entitlement;
+}
+
+function seedBetaTesterAccount(): boolean {
+  const existing = accountEntitlements.find((account) => account.email === betaTesterEmail);
+  const previousPlanId = existing?.planId;
+  const previousStatus = existing?.status;
+  const entitlement = upsertEntitlement(betaTesterEmail, 'institution-license', 'active');
+  return !existing || previousPlanId !== entitlement.planId || previousStatus !== entitlement.status;
+}
+
+function getScopesForEntitlement(entitlement: AccountEntitlement, betaTester: boolean): UserScope[] {
+  const scopes = new Set<UserScope>(['public']);
+  const hasActiveAccess = entitlement.status === 'active' || entitlement.status === 'trialing';
+
+  if (entitlement.email !== 'anonymous') {
+    scopes.add('free');
+  }
+
+  if (hasActiveAccess) {
+    if (entitlement.planId === 'researcher-seat') {
+      scopes.add('paid');
+    }
+
+    if (entitlement.planId === 'studio-seat') {
+      scopes.add('paid');
+      scopes.add('studio');
+    }
+
+    if (entitlement.planId === 'institution-license') {
+      scopes.add('paid');
+      scopes.add('studio');
+      scopes.add('enterprise');
+    }
+  }
+
+  if (betaTester) {
+    scopes.add('free');
+    scopes.add('paid');
+    scopes.add('studio');
+    scopes.add('enterprise');
+    scopes.add('betaTester');
+    scopes.add('admin');
+  }
+
+  return [...scopes];
+}
+
+function getDisplayName(email: string): string {
+  if (email === 'anonymous') {
+    return 'Public Visitor';
+  }
+
+  return email
+    .split('@')[0]
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toLocaleUpperCase()}${part.slice(1)}`)
+    .join(' ') || email;
+}
+
+function normalizeEmail(email?: string): string {
+  return email?.trim().toLocaleLowerCase() ?? '';
 }
 
 function createEmptyUsage(): AccountEntitlement['usage'] {

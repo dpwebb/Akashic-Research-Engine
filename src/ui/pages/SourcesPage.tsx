@@ -134,7 +134,7 @@ export function SourcesPage() {
                 <div className="derived-claims">
                   <div className="derived-claims-header">
                     <h3>Claims Derived From This Source</h3>
-                    <Link to={`/claims?sourceId=${encodeURIComponent(source.id)}`}>Open drilldown</Link>
+                    <Link to={`/app/claims?sourceId=${encodeURIComponent(source.id)}`}>Open drilldown</Link>
                   </div>
                   <ul>
                     {sourceClaims.map((claim) => (
