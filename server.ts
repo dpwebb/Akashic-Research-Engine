@@ -7,6 +7,8 @@ import { getIntegrationStatus } from './src/server/integrations/status.js';
 import { BillingConfigurationError, createStripeCheckoutSession, getBillingPlanOverview } from './src/server/billing/stripeCheckout.js';
 import { generateResearchAssistantOutput } from './src/server/openai/researchAssistant.js';
 import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
+import { getOnlineSignals } from './src/server/discovery/onlineSignals.js';
+import { scrubAkashicUrl } from './src/server/discovery/akashicScrubber.js';
 import { previewSourceImport } from './src/server/importing/sourceImport.js';
 import {
   createSourceFingerprint,
@@ -52,6 +54,7 @@ startRuntimeStateBackups();
 app.use('/api/*', logger());
 app.use('/api/source-import/preview', rateLimit('source-import-preview', { windowMs: 60_000, maxRequests: 12 }));
 app.use('/api/discovery/search', rateLimit('discovery-search', { windowMs: 60_000, maxRequests: 10 }));
+app.use('/api/discovery/scrub', rateLimit('discovery-scrub', { windowMs: 60_000, maxRequests: 12 }));
 app.use('/api/assistant/generate', rateLimit('assistant-generate', { windowMs: 60_000, maxRequests: 6 }));
 app.use('/api/billing/checkout', rateLimit('billing-checkout', { windowMs: 60_000, maxRequests: 8 }));
 
@@ -65,6 +68,41 @@ app.get('/api/health', (c) =>
 );
 
 app.get('/api/integrations', (c) => c.json(getIntegrationStatus()));
+
+
+app.get('/api/admin/config-drilldown', async (c) =>
+  c.json({
+    fetchedAt: new Date().toISOString(),
+    app: {
+      name: 'akashic-research-engine',
+      mode: process.env.NODE_ENV ?? 'development',
+      host,
+      port,
+      origin: getApplicationOrigin(c),
+    },
+    runtime: {
+      persistenceMode: getRuntimePersistenceMode(),
+      backup: await getRuntimeBackupStatus(),
+    },
+    integrations: getIntegrationStatus(),
+    features: {
+      discoverySearchRateLimit: { windowMs: 60_000, maxRequests: 10 },
+      discoveryScrubRateLimit: { windowMs: 60_000, maxRequests: 12 },
+      assistantRateLimit: { windowMs: 60_000, maxRequests: 6 },
+      billingRateLimit: { windowMs: 60_000, maxRequests: 8 },
+      reviewQueueEnabled: true,
+      sourceImportEnabled: true,
+    },
+    dataset: {
+      sources: researchDataset.sources.length,
+      claims: researchDataset.claims.length,
+      genealogyNodes: researchDataset.genealogy.nodes.length,
+      reviewQueue: reviewQueue.length,
+      ingestionJobs: ingestionJobs.length,
+      promotedSources: promotedSources.length,
+    },
+  }),
+);
 
 app.get('/api/operations/command-center', async (c) =>
   c.json({
@@ -132,6 +170,45 @@ app.get('/api/taxonomy', (c) =>
     guardrailRules,
   }),
 );
+
+
+
+const discoveryScrubSchema = z.object({
+  url: z.string().url(),
+});
+
+app.post('/api/discovery/scrub', async (c) => {
+  try {
+    const input = discoveryScrubSchema.parse(await c.req.json());
+    const scrubbed = await scrubAkashicUrl(input.url);
+    return c.json(scrubbed);
+  } catch (error) {
+    console.error('[Discovery Scrub]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Could not scrub URL.' }, 400);
+  }
+});
+
+app.get('/api/online/signals', async (c) => {
+  const topics = [
+    c.req.query('q1')?.trim(),
+    c.req.query('q2')?.trim(),
+    c.req.query('q3')?.trim(),
+  ].filter((value): value is string => Boolean(value));
+
+  const defaultTopics = ['Akashic records', 'Theosophy', 'Esotericism'];
+
+  try {
+    const signals = await getOnlineSignals(topics.length > 0 ? topics : defaultTopics, 2);
+    return c.json({
+      fetchedAt: new Date().toISOString(),
+      topics: topics.length > 0 ? topics : defaultTopics,
+      signals,
+    });
+  } catch (error) {
+    console.error('[Online Signals]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Could not fetch online signals.' }, 502);
+  }
+});
 
 app.get('/api/sources', (c) => c.json(researchDataset.sources));
 

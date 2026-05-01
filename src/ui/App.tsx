@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
-import { Archive, Bot, BriefcaseBusiness, CreditCard, Download, GitFork, Home, Import, Inbox, Library, Radar, Scale, ScrollText, Sparkles } from 'lucide-react';
+import { Archive, Bot, BriefcaseBusiness, CreditCard, Download, GitFork, Home, Import, Inbox, Library, Radar, Scale, ScrollText, Settings, Sparkles } from 'lucide-react';
 import { Dashboard } from './pages/Dashboard.js';
 import { SourcesPage } from './pages/SourcesPage.js';
 import { ClaimsPage } from './pages/ClaimsPage.js';
@@ -13,10 +13,13 @@ import { SourceImportPage } from './pages/SourceImportPage.js';
 import { BillingPage } from './pages/BillingPage.js';
 import { OperationsPage } from './pages/OperationsPage.js';
 import { ExportsPage } from './pages/ExportsPage.js';
+import { AdminConfigPage } from './pages/AdminConfigPage.js';
+import { UserAccessProvider, useUserAccess } from './userAccess.js';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home },
   { to: '/operations', label: 'Operations', icon: BriefcaseBusiness },
+  { to: '/admin/config', label: 'Admin Config', icon: Settings },
   { to: '/research-index', label: 'Index', icon: ScrollText },
   { to: '/sources', label: 'Sources', icon: Library },
   { to: '/claims', label: 'Claims', icon: Scale },
@@ -32,6 +35,17 @@ const navItems = [
 
 export function App() {
   return (
+    <UserAccessProvider>
+      <AppShell />
+    </UserAccessProvider>
+  );
+}
+
+function AppShell() {
+  const { tier, setTier, policy } = useUserAccess();
+  const visibleItems = navItems.filter((item) => item.to !== '/admin/config' || policy.canAccessAdmin);
+
+  return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
@@ -41,8 +55,16 @@ export function App() {
             <span>Evidence-aware esoteric research</span>
           </div>
         </div>
+        <label className="user-tier-switcher">
+          Active user tier
+          <select value={tier} onChange={(event) => setTier(event.target.value as 'free' | 'researcher' | 'enterprise')}>
+            <option value="free">Free</option>
+            <option value="researcher">Researcher</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </label>
         <nav className="nav-list" aria-label="Primary navigation">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink key={item.to} to={item.to} end={item.to === '/'}>
@@ -57,6 +79,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/operations" element={<OperationsPage />} />
+          <Route path="/admin/config" element={policy.canAccessAdmin ? <AdminConfigPage /> : <Dashboard />} />
           <Route path="/research-index" element={<ResearchIndexPage />} />
           <Route path="/sources" element={<SourcesPage />} />
           <Route path="/claims" element={<ClaimsPage />} />
