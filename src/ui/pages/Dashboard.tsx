@@ -1,4 +1,4 @@
-import { AlertTriangle, BookOpenCheck, Database, FileSearch, Inbox, ScrollText } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Database, ExternalLink, FileSearch, Inbox, ScrollText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { researchDataset } from '../../shared/researchData.js';
 import { evidenceGrades, guardrailRules, sourceClassifications } from '../../shared/taxonomy.js';
@@ -28,6 +28,19 @@ type RuntimeSummary = {
   };
 };
 
+
+type OnlineSignalsResponse = {
+  fetchedAt: string;
+  topics: string[];
+  signals: Array<{
+    query: string;
+    title: string;
+    snippet: string;
+    pageUrl: string;
+    timestamp: string;
+  }>;
+};
+
 const emptyRuntimeSummary: RuntimeSummary = {
   reviewQueue: {
     total: 0,
@@ -54,6 +67,7 @@ const emptyRuntimeSummary: RuntimeSummary = {
 
 export function Dashboard() {
   const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary>(emptyRuntimeSummary);
+  const [onlineSignals, setOnlineSignals] = useState<OnlineSignalsResponse | null>(null);
   const sourceCount = researchDataset.sources.length;
   const claimCount = researchDataset.claims.length;
   const speculativeCount = researchDataset.claims.filter((claim) => claim.evidenceGrade === 'E').length;
@@ -66,16 +80,24 @@ export function Dashboard() {
   ).length;
 
   useEffect(() => {
-    async function loadRuntimeSummary() {
-      const response = await fetch('/api/runtime-summary');
+    async function loadDashboardData() {
+      const [summaryResponse, signalsResponse] = await Promise.all([
+        fetch('/api/runtime-summary'),
+        fetch('/api/online/signals'),
+      ]);
 
-      if (response.ok) {
-        const summary = (await response.json()) as RuntimeSummary;
+      if (summaryResponse.ok) {
+        const summary = (await summaryResponse.json()) as RuntimeSummary;
         setRuntimeSummary(summary);
+      }
+
+      if (signalsResponse.ok) {
+        const signals = (await signalsResponse.json()) as OnlineSignalsResponse;
+        setOnlineSignals(signals);
       }
     }
 
-    void loadRuntimeSummary();
+    void loadDashboardData();
   }, []);
 
   return (
@@ -153,6 +175,27 @@ export function Dashboard() {
             <span>Backup path</span>
             <strong>{runtimeSummary.backups.backupDirectory || 'runtime-data/backups'}</strong>
           </article>
+        </div>
+      </section>
+
+
+      <section className="panel">
+        <h2>Online Research Signals</h2>
+        <p className="muted-text">Recent Wikipedia entries related to active Akashic research topics.</p>
+        <div className="rule-list">
+          {(onlineSignals?.signals ?? []).slice(0, 6).map((signal) => (
+            <article key={`${signal.query}-${signal.title}`} className="distribution-row">
+              <span>
+                <strong>{signal.title}</strong> · {signal.query}
+                <br />
+                <small>{signal.snippet}</small>
+              </span>
+              <a href={signal.pageUrl} target="_blank" rel="noreferrer">
+                <ExternalLink size={16} aria-hidden="true" />
+              </a>
+            </article>
+          ))}
+          {onlineSignals?.signals?.length === 0 ? <li>No online signals available right now.</li> : null}
         </div>
       </section>
 
