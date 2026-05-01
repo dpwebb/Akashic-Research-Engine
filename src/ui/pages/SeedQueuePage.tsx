@@ -18,6 +18,7 @@ export function SeedQueuePage() {
   const [sourceTypeFilter, setSourceTypeFilter] = useState<'all' | SourceClassification>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [citationFilter, setCitationFilter] = useState<CitationFilter>('all');
+  const [seedPackFilter, setSeedPackFilter] = useState('all');
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export function SeedQueuePage() {
   const approvedCount = queueItems.filter((item) => item.status === 'approved').length;
   const promotedCount = queueItems.filter((item) => item.status === 'promoted').length;
   const completeCitationCount = queueItems.filter((item) => item.citationStatus === 'complete').length;
+  const selectedSeedPack = seedPacks.find((pack) => pack.id === seedPackFilter);
   const filteredQueueItems = queueItems.filter((item) => {
     const searchableText = [
       item.title,
@@ -124,6 +126,10 @@ export function SeedQueuePage() {
       return false;
     }
 
+    if (selectedSeedPack && !itemMatchesSeedPack(item, selectedSeedPack)) {
+      return false;
+    }
+
     return true;
   });
 
@@ -165,9 +171,17 @@ export function SeedQueuePage() {
         <div className="seed-pack-grid">
           {seedPacks.map((pack) => (
             <article className="seed-pack" key={pack.id}>
+              <div className="result-meta">
+                <span className="tag">{pack.reviewPolicy}</span>
+                <span className="tag">{pack.minimumCitationStatus} citation</span>
+                <span className="tag">{pack.claimExtractionAllowed ? 'claim extraction' : 'no extraction'}</span>
+              </div>
               <h3>{pack.name}</h3>
               <p>{pack.description}</p>
               <p className="muted">{(pack.resourceCount ?? pack.sourceIds.length).toLocaleString()} resource leads</p>
+              <p className="matched-terms">Targets: {pack.targetSourceTypes.join(', ')}</p>
+              <p className="notes">{pack.promotionNotesTemplate}</p>
+              {pack.riskFlags.length > 0 && <p className="matched-terms">Risk flags: {pack.riskFlags.join(', ')}</p>}
               <ul>
                 {pack.querySeeds.map((seedQuery) => (
                   <li key={seedQuery}>{seedQuery}</li>
@@ -179,6 +193,17 @@ export function SeedQueuePage() {
       </section>
 
       <section className="filter-panel">
+        <label>
+          Seed pack
+          <select value={seedPackFilter} onChange={(event) => setSeedPackFilter(event.target.value)}>
+            <option value="all">All seed packs</option>
+            {seedPacks.map((pack) => (
+              <option key={pack.id} value={pack.id}>
+                {pack.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           Search queue
           <input
@@ -344,4 +369,24 @@ export function SeedQueuePage() {
       </section>
     </section>
   );
+}
+
+function itemMatchesSeedPack(item: ReviewQueueItem, seedPack: SeedPack): boolean {
+  if (item.sourceCollection && seedPack.sourceCollections?.includes(item.sourceCollection)) {
+    return true;
+  }
+
+  if (seedPack.targetSourceTypes.includes(item.proposedSourceType)) {
+    const searchableText = [item.title, item.summary, item.citationNotes, item.catalogTags?.join(' ') ?? '']
+      .join(' ')
+      .toLocaleLowerCase();
+    return seedPack.querySeeds.some((seedQuery) =>
+      seedQuery
+        .toLocaleLowerCase()
+        .match(/[a-z0-9]{4,}/g)
+        ?.some((token) => searchableText.includes(token)),
+    );
+  }
+
+  return false;
 }

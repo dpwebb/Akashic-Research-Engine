@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = dirname(__dirname);
 const outputPath = join(projectRoot, 'src', 'shared', 'releaseResourceCatalog.ts');
-const targetResourceCount = 360;
+const targetResourceCount = 400;
 const discoveredAt = '2026-05-01T00:00:00.000Z';
 
 const releaseQueries = [
@@ -15,7 +15,7 @@ const releaseQueries = [
     query: 'theosophy AND mediatype:texts',
     sourceType: 'primary esoteric',
     tags: ['theosophy', 'primary esoteric', 'occult history'],
-    limit: 48,
+    limit: 32,
   },
   {
     id: 'blavatsky',
@@ -23,7 +23,7 @@ const releaseQueries = [
     query: 'blavatsky AND mediatype:texts',
     sourceType: 'primary esoteric',
     tags: ['blavatsky', 'theosophy', 'term lineage'],
-    limit: 34,
+    limit: 24,
   },
   {
     id: 'leadbeater-besant',
@@ -31,7 +31,7 @@ const releaseQueries = [
     query: '(leadbeater OR besant) AND theosophy AND mediatype:texts',
     sourceType: 'primary esoteric',
     tags: ['leadbeater', 'besant', 'clairvoyance'],
-    limit: 36,
+    limit: 26,
   },
   {
     id: 'sinnett-esoteric-buddhism',
@@ -39,7 +39,7 @@ const releaseQueries = [
     query: 'sinnett AND "esoteric buddhism" AND mediatype:texts',
     sourceType: 'primary esoteric',
     tags: ['sinnett', 'esoteric buddhism', 'theosophy'],
-    limit: 24,
+    limit: 18,
   },
   {
     id: 'anthroposophy',
@@ -47,7 +47,7 @@ const releaseQueries = [
     query: 'anthroposophy AND mediatype:texts',
     sourceType: 'primary esoteric',
     tags: ['anthroposophy', 'steiner', 'akashic chronicle'],
-    limit: 42,
+    limit: 28,
   },
   {
     id: 'rudolf-steiner',
@@ -55,7 +55,7 @@ const releaseQueries = [
     query: '"Rudolf Steiner" AND mediatype:texts',
     sourceType: 'primary esoteric',
     tags: ['rudolf steiner', 'anthroposophy', 'spiritual science'],
-    limit: 42,
+    limit: 28,
   },
   {
     id: 'akashic-akasha',
@@ -63,7 +63,7 @@ const releaseQueries = [
     query: '(akashic OR akasha) AND mediatype:texts',
     sourceType: 'religious/comparative',
     tags: ['akasha', 'akashic records', 'terminology'],
-    limit: 34,
+    limit: 28,
   },
   {
     id: 'new-thought-metaphysical',
@@ -71,7 +71,7 @@ const releaseQueries = [
     query: '"New Thought" AND metaphysical AND mediatype:texts',
     sourceType: 'modern spiritual',
     tags: ['new thought', 'modern spiritual', 'metaphysical publishing'],
-    limit: 34,
+    limit: 24,
   },
   {
     id: 'edgar-cayce',
@@ -79,7 +79,7 @@ const releaseQueries = [
     query: '"Edgar Cayce" AND mediatype:texts',
     sourceType: 'modern spiritual',
     tags: ['edgar cayce', 'book of life', 'modern spiritual'],
-    limit: 30,
+    limit: 24,
   },
   {
     id: 'spiritualism-psychical',
@@ -87,7 +87,7 @@ const releaseQueries = [
     query: '(spiritualism OR "psychical research") AND mediatype:texts',
     sourceType: 'historical',
     tags: ['spiritualism', 'psychical research', 'historical context'],
-    limit: 42,
+    limit: 28,
   },
   {
     id: 'western-esotericism',
@@ -95,7 +95,7 @@ const releaseQueries = [
     query: '("western esotericism" OR occultism) AND mediatype:texts',
     sourceType: 'historical',
     tags: ['western esotericism', 'occultism', 'historical context'],
-    limit: 46,
+    limit: 28,
   },
   {
     id: 'comparative-religion',
@@ -103,7 +103,7 @@ const releaseQueries = [
     query: '("comparative religion" OR "hindu philosophy" OR jainism) AND mediatype:texts',
     sourceType: 'religious/comparative',
     tags: ['comparative religion', 'hindu philosophy', 'jainism'],
-    limit: 42,
+    limit: 28,
   },
   {
     id: 'collective-unconscious',
@@ -111,7 +111,7 @@ const releaseQueries = [
     query: '("collective unconscious" OR archetypes) AND mediatype:texts',
     sourceType: 'academic',
     tags: ['collective unconscious', 'psychology', 'analogue'],
-    limit: 20,
+    limit: 18,
   },
   {
     id: 'mysticism-history',
@@ -119,7 +119,23 @@ const releaseQueries = [
     query: '(mysticism OR "religious experience") AND mediatype:texts',
     sourceType: 'academic',
     tags: ['mysticism', 'religious experience', 'academic context'],
-    limit: 36,
+    limit: 22,
+  },
+  {
+    id: 'critical-skeptical',
+    name: 'Critical and skeptical historiography',
+    query: '(theosophy OR occultism OR spiritualism) AND (criticism OR skeptical OR fraud OR imposture) AND mediatype:texts',
+    sourceType: 'historical',
+    tags: ['critical history', 'skeptical context', 'source reliability'],
+    limit: 24,
+  },
+  {
+    id: 'modern-commercialization',
+    name: 'Modern spiritual commercialization',
+    query: '("Akashic Records" OR metaphysical) AND (reading OR healing OR course) AND mediatype:texts',
+    sourceType: 'commercial',
+    tags: ['commercialization', 'readings', 'modern spiritual services'],
+    limit: 20,
   },
 ];
 
@@ -194,7 +210,7 @@ async function fetchInternetArchiveDocs(querySpec) {
 
   const payload = await response.json();
   const docs = Array.isArray(payload.response?.docs) ? payload.response.docs : [];
-  return docs.slice(0, querySpec.limit * 2);
+  return docs.slice(0, querySpec.limit);
 }
 
 function toReviewQueueItem(doc, querySpec, index) {

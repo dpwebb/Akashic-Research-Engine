@@ -112,6 +112,8 @@ export type DiscoverySearchResponse = {
   };
 };
 
+export type SeedReviewPolicy = 'auto-promote' | 'manual' | 'quarantine' | 'citation-only';
+
 export type SeedPack = {
   id: string;
   name: string;
@@ -119,6 +121,13 @@ export type SeedPack = {
   querySeeds: string[];
   sourceIds: string[];
   resourceCount?: number;
+  sourceCollections?: string[];
+  reviewPolicy: SeedReviewPolicy;
+  targetSourceTypes: SourceClassification[];
+  minimumCitationStatus: CitationStatus;
+  claimExtractionAllowed: boolean;
+  promotionNotesTemplate: string;
+  riskFlags: string[];
 };
 
 export type CitationStatus = 'complete' | 'partial' | 'needs review';
