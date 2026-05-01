@@ -48,6 +48,7 @@ This repository is configured for deployment on **Hostinger VPS** with the custo
 
 See `HOSTINGER_DEPLOYMENT.md` for the Hostinger Docker/Traefik deployment flow.
 See `docs/github-source-of-truth.md` for the GitHub source-of-truth rules shared by the online applications.
+See `docs/codex-multi-device-workflow.md` for the recommended Windows Desktop + iPhone Codex handoff process.
 
 Before deploying from this PC:
 

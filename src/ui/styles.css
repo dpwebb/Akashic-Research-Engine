@@ -1329,3 +1329,32 @@ td span {
     text-align: left;
   }
 }
+
+.config-json {
+  margin: 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: #111a15;
+  color: #d9f2df;
+  overflow: auto;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+
+.user-tier-switcher {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  color: #dce9e1;
+  font-size: 0.86rem;
+}
+
+.user-tier-switcher select {
+  border: 1px solid rgb(255 255 255 / 26%);
+  border-radius: 8px;
+  background: #214636;
+  color: #f8fbf6;
+  padding: 8px;
+}
+

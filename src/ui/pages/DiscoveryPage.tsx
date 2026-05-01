@@ -3,6 +3,7 @@ import { ExternalLink, Filter, Plus, Search } from 'lucide-react';
 import { evidenceGrades, sourceClassifications, type EvidenceGrade, type SourceClassification } from '../../shared/taxonomy.js';
 import { researchDataset } from '../../shared/researchData.js';
 import type { DiscoverySearchResponse } from '../../shared/types.js';
+import { useUserAccess } from '../userAccess.js';
 
 type SearchScope = 'combined' | 'engine' | 'web';
 
@@ -32,6 +33,10 @@ export function DiscoveryPage() {
   const [error, setError] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [scrubUrl, setScrubUrl] = useState('');
+  const [scrubResult, setScrubResult] = useState<any | null>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const { policy, tier } = useUserAccess();
 
   const searchPayload = useMemo(
     () => ({
@@ -140,6 +145,33 @@ export function DiscoveryPage() {
     }
   }
 
+
+  async function runScrubber(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setSaveMessage('');
+    setIsScrubbing(true);
+
+    try {
+      const response = await fetch('/api/discovery/scrub', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: scrubUrl.trim() }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? 'Scrubber failed.');
+      }
+
+      setScrubResult(data);
+    } catch (scrubError) {
+      setError(scrubError instanceof Error ? scrubError.message : 'Scrubber failed.');
+    } finally {
+      setIsScrubbing(false);
+    }
+  }
+
   return (
     <section className="page-stack">
       <header className="page-header compact">
@@ -147,6 +179,32 @@ export function DiscoveryPage() {
         <h1>Discovery Engine</h1>
         <p>Search the engine corpus and the public web with precise filters, relevance scoring, and citation review cues.</p>
       </header>
+
+
+
+      <section className="panel">
+        <h2>Akashic Internet Scrubber</h2>
+        <p>Paste a public URL to sanitize and score relevance before adding it to your research queue. Active tier: {tier}.</p>
+        <form className="assistant-form" onSubmit={runScrubber}>
+          <label>
+            URL to scrub
+            <input value={scrubUrl} onChange={(event) => setScrubUrl(event.target.value)} placeholder="https://example.org/article" />
+          </label>
+          <button type="submit" disabled={!policy.canUseScrubber || isScrubbing || scrubUrl.trim().length < 8}>
+            {isScrubbing ? 'Scrubbing…' : 'Scrub URL'}
+          </button>
+        </form>
+        {!policy.canUseScrubber ? <p className="form-error">Upgrade to Researcher or Enterprise to enable the scrubber.</p> : null}
+        {scrubResult ? (
+          <article className="review-card">
+            <h3>{scrubResult.title}</h3>
+            <p>{scrubResult.summary}</p>
+            <p><strong>Relevance:</strong> {scrubResult.akashicRelevance}% · <strong>Recommendation:</strong> {scrubResult.recommendation}</p>
+            <p><strong>Keywords:</strong> {scrubResult.matchedKeywords.join(', ') || 'none'}</p>
+            <p><strong>Risk flags:</strong> {scrubResult.riskFlags.join(', ') || 'none'}</p>
+          </article>
+        ) : null}
+      </section>
 
       <form className="assistant-form discovery-form" onSubmit={runDiscovery}>
         <label>
