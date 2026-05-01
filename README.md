@@ -45,6 +45,8 @@ This repository is configured for deployment on **Hostinger VPS** with the custo
    pnpm run scrape:release-resources
    ```
    The scraper fails if fewer than 300 reviewable resources are collected.
+   Curated seed resources are reviewed, approved, and promoted automatically during runtime seeding. Set
+   `SEED_REVIEW_AUTOMATION=manual` to revoke that automation and return seed resources to manual review.
 5. Run the production server locally after building:
    ```bash
    pnpm start

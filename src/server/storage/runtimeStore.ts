@@ -28,6 +28,9 @@ const runtimeBackupIntervalMs =
   Number.isFinite(configuredBackupIntervalMs) && configuredBackupIntervalMs > 0
     ? configuredBackupIntervalMs
     : 3_600_000;
+const seedReviewAutomationEnabled = !['0', 'false', 'off', 'disabled', 'manual'].includes(
+  (process.env.SEED_REVIEW_AUTOMATION ?? 'auto-promote').trim().toLocaleLowerCase(),
+);
 let state: RuntimeState | null = null;
 let writeChain = Promise.resolve();
 let backupChain = Promise.resolve();
@@ -141,6 +144,10 @@ export function getRuntimePersistenceMode(): RuntimePersistenceMode {
   return persistenceMode;
 }
 
+export function isSeedReviewAutomationEnabled(): boolean {
+  return seedReviewAutomationEnabled;
+}
+
 function normalizeReviewQueueItems(items: ReviewQueueItem[]): ReviewQueueItem[] {
   return items.map((item) => {
     try {
@@ -212,11 +219,115 @@ function mergeReviewQueueWithSeedItems(items: ReviewQueueItem[]): ReviewQueueIte
   return merged;
 }
 
+function automateSeedReviewApprovals(
+  reviewQueue: ReviewQueueItem[],
+  promotedSources: PromotedSource[],
+): { reviewQueue: ReviewQueueItem[]; promotedSources: PromotedSource[] } {
+  if (!seedReviewAutomationEnabled) {
+    return { reviewQueue, promotedSources };
+  }
+
+  const seedCanonicalUrls = new Set(seedReviewQueue.map((item) => getCanonicalReviewQueueUrl(item)));
+  const promotedByReviewItem = new Map(promotedSources.map((source) => [source.reviewQueueItemId, source]));
+  const promotedByCanonicalUrl = new Map(
+    promotedSources
+      .map((source) => [getCanonicalPromotedSourceUrl(source), source] as const)
+      .filter(([canonicalUrl]) => Boolean(canonicalUrl)),
+  );
+  const nextPromotedSources = [...promotedSources];
+
+  const automatedReviewQueue = reviewQueue.map((item) => {
+    if (item.provenance !== 'curated seed' || !seedCanonicalUrls.has(getCanonicalReviewQueueUrl(item))) {
+      return item;
+    }
+
+    if (item.status === 'rejected') {
+      return item;
+    }
+
+    const automationAt = item.reviewedAt ?? item.promotedAt ?? item.discoveredAt ?? new Date().toISOString();
+    const existingPromotedSource =
+      promotedByReviewItem.get(item.id) ?? promotedByCanonicalUrl.get(getCanonicalReviewQueueUrl(item));
+    const promotedSource = existingPromotedSource ?? createPromotedSourceFromSeedItem(item, automationAt);
+
+    if (!existingPromotedSource) {
+      nextPromotedSources.unshift(promotedSource);
+      promotedByReviewItem.set(item.id, promotedSource);
+      promotedByCanonicalUrl.set(getCanonicalReviewQueueUrl(item), promotedSource);
+    }
+
+    return {
+      ...item,
+      status: 'promoted' as const,
+      reviewedAt: automationAt,
+      promotedAt: item.promotedAt ?? promotedSource.promotedAt,
+      promotedSourceId: item.promotedSourceId ?? promotedSource.id,
+      assignedReviewer: item.assignedReviewer ?? 'Seed automation',
+      decisionReason:
+        item.decisionReason ??
+        'Automated seed pipeline reviewed, approved, and promoted this curated seed resource for initial dataset population.',
+    };
+  });
+
+  return {
+    reviewQueue: automatedReviewQueue,
+    promotedSources: dedupePromotedSources(nextPromotedSources),
+  };
+}
+
+function createPromotedSourceFromSeedItem(item: ReviewQueueItem, promotedAt: string): PromotedSource {
+  return {
+    id: `seed-promoted-${slugify(item.id)}`,
+    title: item.title,
+    author: item.author ?? 'Pending review',
+    date: item.publicationDate ?? item.discoveredAt.slice(0, 10),
+    url: item.url,
+    canonicalUrl: item.canonicalUrl,
+    sourceFingerprint:
+      item.sourceFingerprint ??
+      createSourceFingerprint({
+        title: item.title,
+        author: item.author,
+        date: item.publicationDate,
+        url: item.url,
+        domain: item.domain,
+      }),
+    sourceType: item.proposedSourceType,
+    summary: item.summary,
+    confidenceLevel: item.confidenceLevel,
+    citationNotes: item.stableCitation ? `${item.stableCitation} ${item.citationNotes}` : item.citationNotes,
+    reviewQueueItemId: item.id,
+    promotedAt,
+    promotionNotes: 'Auto-promoted from the curated seed catalogue during runtime seed normalization.',
+  };
+}
+
+function dedupePromotedSources(promotedSources: PromotedSource[]): PromotedSource[] {
+  const seen = new Set<string>();
+  return promotedSources.filter((source) => {
+    const identity = source.reviewQueueItemId || getCanonicalPromotedSourceUrl(source) || source.id;
+    if (seen.has(identity)) {
+      return false;
+    }
+
+    seen.add(identity);
+    return true;
+  });
+}
+
 function getCanonicalReviewQueueUrl(item: ReviewQueueItem): string {
   try {
     return item.canonicalUrl ?? normalizeSourceUrl(item.url);
   } catch {
     return item.url;
+  }
+}
+
+function getCanonicalPromotedSourceUrl(source: PromotedSource): string {
+  try {
+    return source.canonicalUrl ?? normalizeSourceUrl(source.url);
+  } catch {
+    return source.url;
   }
 }
 
@@ -248,13 +359,21 @@ async function writeAtomically(path: string, content: string): Promise<void> {
 }
 
 function normalizeRuntimeState(rawState: Partial<RuntimeState>): RuntimeState {
+  const reviewQueue = mergeReviewQueueWithSeedItems(Array.isArray(rawState.reviewQueue) ? rawState.reviewQueue : []);
+  const promotedSources = Array.isArray(rawState.promotedSources) ? rawState.promotedSources : [];
+  const automatedSeedState = automateSeedReviewApprovals(reviewQueue, promotedSources);
+
   return {
-    reviewQueue: mergeReviewQueueWithSeedItems(Array.isArray(rawState.reviewQueue) ? rawState.reviewQueue : []),
+    reviewQueue: automatedSeedState.reviewQueue,
     ingestionJobs: normalizeIngestionJobs(Array.isArray(rawState.ingestionJobs) ? rawState.ingestionJobs : []),
-    promotedSources: Array.isArray(rawState.promotedSources) ? rawState.promotedSources : [],
+    promotedSources: automatedSeedState.promotedSources,
     accountEntitlements: Array.isArray(rawState.accountEntitlements) ? rawState.accountEntitlements : [],
     exportDeliverables: Array.isArray(rawState.exportDeliverables) ? rawState.exportDeliverables : [],
   };
+}
+
+function slugify(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 96);
 }
 
 async function loadStateFromPostgres(): Promise<RuntimeState | null> {

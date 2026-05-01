@@ -34,6 +34,7 @@ type NormalizedDiscoverySearchRequest = DiscoverySearchRequest & {
 
 export async function discoverRelatedSources(
   request: DiscoverySearchRequest,
+  runtimeSources: Source[] = [],
 ): Promise<DiscoverySearchResponse> {
   const warnings: string[] = [];
   const query = request.query.trim();
@@ -41,7 +42,7 @@ export async function discoverRelatedSources(
   const maxResults = Math.min(Math.max(normalizedRequest.maxResults, 1), 20);
   const effectiveWebQuery = buildWebQuery(query, normalizedRequest);
   const engineResults =
-    normalizedRequest.scope === 'web' ? [] : searchEngineCorpus(normalizedRequest);
+    normalizedRequest.scope === 'web' ? [] : searchEngineCorpus(normalizedRequest, runtimeSources);
   let webResults: DiscoverySearchResult[] = [];
 
   if (normalizedRequest.scope !== 'engine') {
@@ -127,8 +128,11 @@ function buildWebQuery(query: string, request: NormalizedDiscoverySearchRequest)
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
-function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): DiscoverySearchResult[] {
-  const sourceMatches = researchDataset.sources.map((source) => scoreSource(source, request));
+function searchEngineCorpus(
+  request: NormalizedDiscoverySearchRequest,
+  runtimeSources: Source[],
+): DiscoverySearchResult[] {
+  const sourceMatches = getSearchableSources(runtimeSources).map((source) => scoreSource(source, request));
   const claimMatches: DiscoverySearchResult[] = researchDataset.claims.map((claim) => {
     const source = researchDataset.sources.find((item) => item.id === claim.sourceId);
     const text = [claim.text, claim.type, claim.notes, source?.title, source?.summary].join(' ');
@@ -393,6 +397,15 @@ function searchEngineCorpus(request: NormalizedDiscoverySearchRequest): Discover
 
     return true;
   });
+}
+
+function getSearchableSources(runtimeSources: Source[]): Source[] {
+  const sourcesByUrl = new Map<string, Source>();
+  for (const source of [...researchDataset.sources, ...runtimeSources]) {
+    sourcesByUrl.set(source.canonicalUrl ?? source.url, source);
+  }
+
+  return [...sourcesByUrl.values()];
 }
 
 function scoreSource(source: Source, request: NormalizedDiscoverySearchRequest): DiscoverySearchResult {

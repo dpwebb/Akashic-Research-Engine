@@ -17,7 +17,9 @@ type RuntimeSummary = {
     citationPartial: number;
     citationNeedsReview: number;
     releaseResourceMinimum: number;
+    seedReviewAutomationEnabled: boolean;
   };
+  promotedSources: number;
   ingestionJobs: {
     total: number;
     queued: number;
@@ -59,7 +61,9 @@ const emptyRuntimeSummary: RuntimeSummary = {
     citationPartial: 0,
     citationNeedsReview: 0,
     releaseResourceMinimum: 300,
+    seedReviewAutomationEnabled: true,
   },
+  promotedSources: 0,
   ingestionJobs: {
     total: 0,
     queued: 0,
@@ -78,7 +82,8 @@ export function Dashboard() {
   const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary>(emptyRuntimeSummary);
   const { policy, tier } = useUserAccess();
   const [onlineSignals, setOnlineSignals] = useState<OnlineSignalsResponse | null>(null);
-  const sourceCount = researchDataset.sources.length;
+  const canonicalSourceCount = researchDataset.sources.length;
+  const sourceCount = canonicalSourceCount + runtimeSummary.promotedSources;
   const claimCount = researchDataset.claims.length;
   const speculativeCount = researchDataset.claims.filter((claim) => claim.evidenceGrade === 'E').length;
   const primarySourceCount = researchDataset.sources.filter((source) => source.sourceType === 'primary esoteric').length;
@@ -122,7 +127,7 @@ export function Dashboard() {
       </header>
 
       <div className="metric-grid">
-        <Metric icon={Database} label="Seeded sources" value={sourceCount} />
+        <Metric icon={Database} label="Dataset sources" value={sourceCount} />
         <Metric icon={BookOpenCheck} label="Extracted claims" value={claimCount} />
         <Metric icon={FileSearch} label="Genealogy nodes" value={researchDataset.genealogy.nodes.length} />
         <Metric icon={ScrollText} label="Index records" value={getIndexRecordCount()} />
@@ -133,7 +138,7 @@ export function Dashboard() {
       <section className="panel">
         <h2>Corpus Health</h2>
         <div className="health-grid">
-          <HealthStat label="Primary esoteric sources" value={primarySourceCount} total={sourceCount} />
+          <HealthStat label="Primary esoteric sources" value={primarySourceCount} total={canonicalSourceCount} />
           <HealthStat label="Public-domain bibliography" value={publicDomainCount} total={researchDataset.index.bibliography.length} />
           <HealthStat label="Bibliography needing citation review" value={citationReviewCount} total={researchDataset.index.bibliography.length} />
           <HealthStat label="Claims requiring citation" value={researchDataset.claims.filter((claim) => claim.citationRequired).length} total={claimCount} />
@@ -167,6 +172,11 @@ export function Dashboard() {
             label="Initial release resource floor"
             value={runtimeSummary.reviewQueue.total}
             total={runtimeSummary.reviewQueue.releaseResourceMinimum}
+          />
+          <HealthStat
+            label="Auto-promoted seed sources"
+            value={runtimeSummary.promotedSources}
+            total={Math.max(runtimeSummary.reviewQueue.total, 1)}
           />
           <HealthStat
             label="Failed ingestion jobs"

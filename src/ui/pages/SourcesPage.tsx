@@ -1,20 +1,33 @@
 import { ExternalLink } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { researchDataset } from '../../shared/researchData.js';
 import { sourceClassifications, type SourceClassification } from '../../shared/taxonomy.js';
+import type { Source } from '../../shared/types.js';
 
 type ConfidenceFilter = 'all' | 'high' | 'medium' | 'low';
 
 export function SourcesPage() {
+  const [sources, setSources] = useState<Source[]>(researchDataset.sources);
   const [query, setQuery] = useState('');
   const [sourceType, setSourceType] = useState<'all' | SourceClassification>('all');
   const [confidence, setConfidence] = useState<ConfidenceFilter>('all');
   const [primaryOnly, setPrimaryOnly] = useState(false);
 
+  useEffect(() => {
+    async function loadSources() {
+      const response = await fetch('/api/sources');
+      if (response.ok) {
+        setSources(await response.json());
+      }
+    }
+
+    void loadSources();
+  }, []);
+
   const filteredSources = useMemo(
     () =>
-      researchDataset.sources.filter((source) => {
+      sources.filter((source) => {
         const sourceClaims = researchDataset.claims.filter((claim) => claim.sourceId === source.id);
         const searchableText = [
           source.title,
@@ -46,7 +59,7 @@ export function SourcesPage() {
 
         return true;
       }),
-    [confidence, primaryOnly, query, sourceType],
+    [confidence, primaryOnly, query, sourceType, sources],
   );
 
   return (
@@ -106,7 +119,9 @@ export function SourcesPage() {
                 <div className="result-meta">
                   <span className="tag">{source.sourceType}</span>
                   <span className="tag">{source.confidenceLevel}</span>
-                  <span className="tag">{sourceClaims.length} claims</span>
+                  <span className="tag">
+                    {source.id.startsWith('seed-promoted-') ? 'promoted seed' : `${sourceClaims.length} claims`}
+                  </span>
                 </div>
                 <h2>{source.title}</h2>
                 <p className="muted">

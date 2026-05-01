@@ -26,6 +26,8 @@ type OperationsOverview = {
     citationNeedsReview: number;
     releaseResourceMinimum: number;
     releaseResourceCount: number;
+    seedReviewAutomationEnabled: boolean;
+    autoPromotedSeedItems: number;
     nextItems: ReviewQueueItem[];
   };
   ingestionJobs: {
@@ -120,6 +122,7 @@ export function OperationsPage() {
             <Health label="Complete citations" value={overview.reviewQueue.citationComplete} />
             <Health label="Citation review" value={overview.reviewQueue.citationNeedsReview} />
             <Health label="Release floor" value={`${overview.reviewQueue.total}/${overview.reviewQueue.releaseResourceMinimum}`} />
+            <Health label="Auto-promoted seeds" value={overview.reviewQueue.autoPromotedSeedItems} />
           </div>
         </article>
 

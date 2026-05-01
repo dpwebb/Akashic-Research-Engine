@@ -21,6 +21,7 @@ Build the platform using the Hostinger VPS pattern already used by the other app
 7. Ingestion jobs for source collection and later worker automation.
 8. Duplicate detection for source imports, review queue entries, ingestion jobs, and claim fingerprints.
 9. Initial-release source catalogue with at least 300 review resources, stable citations, source classifications, tags, and required review actions.
+10. Default-on seed automation that reviews, approves, and promotes curated seed resources into the runtime source dataset until `SEED_REVIEW_AUTOMATION=manual` revokes it.
 
 ## Guardrails
 

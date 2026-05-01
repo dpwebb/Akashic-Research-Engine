@@ -20,6 +20,7 @@ import { rateLimit } from './src/server/security/rateLimit.js';
 import {
   getRuntimePersistenceMode,
   getRuntimeBackupStatus,
+  isSeedReviewAutomationEnabled,
   loadRuntimeState,
   persistRuntimeState,
   startRuntimeStateBackups,
@@ -38,6 +39,7 @@ import type {
   IngestionJob,
   PromotedSource,
   ReviewQueueItem,
+  Source,
   UsageMetric,
 } from './src/shared/types.js';
 
@@ -45,6 +47,7 @@ const port = Number.parseInt(process.env.PORT ?? '3500', 10);
 const host = process.env.HOST ?? '0.0.0.0';
 const app = new Hono();
 const runtimeState = await loadRuntimeState();
+await persistRuntimeState();
 const reviewQueue = runtimeState.reviewQueue;
 const ingestionJobs = runtimeState.ingestionJobs;
 const promotedSources = runtimeState.promotedSources;
@@ -94,9 +97,10 @@ app.get('/api/admin/config-drilldown', async (c) =>
       reviewQueueEnabled: true,
       sourceImportEnabled: true,
       releaseResourceMinimum,
+      seedReviewAutomationEnabled: isSeedReviewAutomationEnabled(),
     },
     dataset: {
-      sources: researchDataset.sources.length,
+      sources: getAllSources().length,
       claims: researchDataset.claims.length,
       genealogyNodes: researchDataset.genealogy.nodes.length,
       releaseResources: releaseResourceCount,
@@ -211,10 +215,10 @@ app.get('/api/online/signals', async (c) => {
   }
 });
 
-app.get('/api/sources', (c) => c.json(researchDataset.sources));
+app.get('/api/sources', (c) => c.json(getAllSources()));
 
 app.get('/api/sources/:id', (c) => {
-  const source = researchDataset.sources.find((item) => item.id === c.req.param('id'));
+  const source = getAllSources().find((item) => item.id === c.req.param('id'));
   if (!source) {
     return c.json({ error: 'Source not found' }, 404);
   }
@@ -250,6 +254,7 @@ app.get('/api/runtime-summary', async (c) =>
       citationPartial: reviewQueue.filter((item) => item.citationStatus === 'partial').length,
       citationNeedsReview: reviewQueue.filter((item) => item.citationStatus === 'needs review' || !item.citationStatus).length,
       releaseResourceMinimum,
+      seedReviewAutomationEnabled: isSeedReviewAutomationEnabled(),
     },
     ingestionJobs: {
       total: ingestionJobs.length,
@@ -534,7 +539,7 @@ app.post('/api/discovery/search', async (c) => {
   try {
     const input = discoverySearchSchema.parse(await c.req.json());
     assertUsageAllowed(c, 'discoverySearches');
-    const output = await discoverRelatedSources(input);
+    const output = await discoverRelatedSources(input, promotedSources);
     incrementUsage(c, 'discoverySearches');
     await persistRuntimeState();
     return c.json(output);
@@ -635,6 +640,8 @@ function getReviewOperationsSummary() {
     citationNeedsReview: reviewQueue.filter((item) => item.citationStatus === 'needs review' || !item.citationStatus).length,
     releaseResourceMinimum,
     releaseResourceCount,
+    seedReviewAutomationEnabled: isSeedReviewAutomationEnabled(),
+    autoPromotedSeedItems: reviewQueue.filter((item) => item.provenance === 'curated seed' && item.status === 'promoted').length,
     nextItems: reviewQueue
       .filter((item) => item.status === 'pending' || item.status === 'reviewed' || item.status === 'approved')
       .slice(0, 8),
@@ -684,6 +691,9 @@ function getOperationsActionItems(): string[] {
 
   if (getRuntimePersistenceMode() === 'json') {
     actions.push('Configure DATABASE_URL to activate PostgreSQL runtime persistence.');
+  }
+  if (!review.seedReviewAutomationEnabled) {
+    actions.push('Seed review automation is disabled; curated seed resources will remain in manual review until re-enabled.');
   }
   if (review.total < releaseResourceMinimum) {
     actions.push(`Initial release requires at least ${releaseResourceMinimum} review resources; current queue has ${review.total}.`);
@@ -869,10 +879,23 @@ function renderExportMarkdown(type: ExportDeliverableType, title: string): strin
   return [
     `# ${title}`,
     '',
-    ...researchDataset.sources.map((source) =>
+    ...getAllSources().map((source) =>
       [`## ${source.title}`, `Type: ${source.sourceType}`, `URL: ${source.url}`, source.citationNotes].join('\n'),
     ),
   ].join('\n\n');
+}
+
+function getAllSources(): Source[] {
+  const canonicalSources = new Map<string, Source>();
+
+  for (const source of [...researchDataset.sources, ...promotedSources]) {
+    const key = source.canonicalUrl ?? source.url;
+    if (!canonicalSources.has(key)) {
+      canonicalSources.set(key, source);
+    }
+  }
+
+  return [...canonicalSources.values()];
 }
 
 function slugify(value: string): string {
