@@ -57,6 +57,29 @@ export type AdditionFramework = {
   reviewPriority: 'low' | 'medium' | 'high';
 };
 
+export type SpeculativeAdditionDraftStatus = 'draft' | 'ready for review' | 'archived';
+
+export type SpeculativeAdditionDraft = {
+  id: string;
+  title: string;
+  frameworkId: string;
+  frameworkName: string;
+  evidenceGrade: EvidenceGrade;
+  reviewPriority: 'low' | 'medium' | 'high';
+  uncertainty: string;
+  proposal: string;
+  sourceIds: string[];
+  citationsNeeded: string;
+  counterarguments: string;
+  notJustified: string;
+  guardrails: string[];
+  briefMarkdown: string;
+  status: SpeculativeAdditionDraftStatus;
+  createdByEmail?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type DiscoverySearchRequest = {
   query: string;
   scope: 'combined' | 'engine' | 'web';

@@ -40,6 +40,7 @@ import type {
   IngestionJob,
   PromotedSource,
   ReviewQueueItem,
+  SpeculativeAdditionDraft,
   UserScope,
   Source,
   UsageMetric,
@@ -55,6 +56,7 @@ const ingestionJobs = runtimeState.ingestionJobs;
 const promotedSources = runtimeState.promotedSources;
 const accountEntitlements = runtimeState.accountEntitlements;
 const exportDeliverables = runtimeState.exportDeliverables;
+const speculativeAdditionDrafts = runtimeState.speculativeAdditionDrafts;
 const betaTesterEmail = normalizeEmail(process.env.BETA_TESTER_EMAIL || 'beta@akashicresearch.info');
 if (seedBetaTesterAccount()) {
   await persistRuntimeState();
@@ -66,6 +68,7 @@ app.use('/api/source-import/preview', rateLimit('source-import-preview', { windo
 app.use('/api/discovery/search', rateLimit('discovery-search', { windowMs: 60_000, maxRequests: 10 }));
 app.use('/api/discovery/scrub', rateLimit('discovery-scrub', { windowMs: 60_000, maxRequests: 12 }));
 app.use('/api/assistant/generate', rateLimit('assistant-generate', { windowMs: 60_000, maxRequests: 6 }));
+app.use('/api/addition-builder/drafts', rateLimit('addition-builder-drafts', { windowMs: 60_000, maxRequests: 12 }));
 app.use('/api/billing/checkout', rateLimit('billing-checkout', { windowMs: 60_000, maxRequests: 8 }));
 
 app.get('/api/health', (c) =>
@@ -113,6 +116,7 @@ app.get('/api/admin/config-drilldown', async (c) =>
       reviewQueue: reviewQueue.length,
       ingestionJobs: ingestionJobs.length,
       promotedSources: promotedSources.length,
+      speculativeAdditionDrafts: speculativeAdditionDrafts.length,
     },
   }),
 );
@@ -275,6 +279,7 @@ app.get('/api/runtime-summary', async (c) =>
       failed: ingestionJobs.filter((job) => job.status === 'failed').length,
     },
     promotedSources: promotedSources.length,
+    speculativeAdditionDrafts: speculativeAdditionDrafts.length,
     backups: await getRuntimeBackupStatus(),
   }),
 );
@@ -626,6 +631,78 @@ app.post('/api/exports', async (c) => {
 
 app.get('/api/addition-builder/frameworks', (c) => c.json(researchDataset.additionFrameworks));
 
+app.get('/api/addition-builder/drafts', (c) => {
+  try {
+    assertAdditionBuilderAllowed(c);
+    return c.json(speculativeAdditionDrafts.slice(0, 50));
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : 'Addition builder access is required.' }, 403);
+  }
+});
+
+const speculativeAdditionDraftSchema = z.object({
+  title: z.string().min(2).max(180),
+  frameworkId: z.string().min(1).max(120),
+  uncertainty: z.string().min(1).max(160),
+  proposal: z.string().min(30).max(1800),
+  sourceIds: z.array(z.string().min(1).max(120)).min(1).max(24),
+  citationsNeeded: z.string().max(900).optional().default(''),
+  counterarguments: z.string().min(20).max(1200),
+  notJustified: z.string().min(20).max(1200),
+  guardrails: z.array(z.string().min(1).max(180)).min(1).max(12),
+  briefMarkdown: z.string().min(50).max(12_000),
+  createdByEmail: z.string().email().optional(),
+});
+
+app.post('/api/addition-builder/drafts', async (c) => {
+  try {
+    const input = speculativeAdditionDraftSchema.parse(await c.req.json());
+    assertAdditionBuilderAllowed(c, input.createdByEmail);
+    assertUsageAllowed(c, 'reviewSubmissions', input.createdByEmail);
+
+    const framework = researchDataset.additionFrameworks.find((candidate) => candidate.id === input.frameworkId);
+    if (!framework) {
+      return c.json({ error: 'Selected speculation framework was not found.' }, 400);
+    }
+
+    const knownSourceIds = new Set(researchDataset.sources.map((source) => source.id));
+    const sourceIds = [...new Set(input.sourceIds)].filter((sourceId) => knownSourceIds.has(sourceId));
+    if (sourceIds.length === 0) {
+      return c.json({ error: 'Select at least one known source before saving the draft.' }, 400);
+    }
+
+    const now = new Date().toISOString();
+    const draft: SpeculativeAdditionDraft = {
+      id: `speculative-addition-${Date.now()}-${slugify(input.title)}`,
+      title: input.title.trim(),
+      frameworkId: framework.id,
+      frameworkName: framework.name,
+      evidenceGrade: framework.evidenceGrade,
+      reviewPriority: framework.reviewPriority,
+      uncertainty: input.uncertainty.trim(),
+      proposal: input.proposal.trim(),
+      sourceIds,
+      citationsNeeded: input.citationsNeeded.trim(),
+      counterarguments: input.counterarguments.trim(),
+      notJustified: input.notJustified.trim(),
+      guardrails: input.guardrails,
+      briefMarkdown: input.briefMarkdown,
+      status: 'draft',
+      createdByEmail: input.createdByEmail ? normalizeEmail(input.createdByEmail) : undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    speculativeAdditionDrafts.unshift(draft);
+    incrementUsage(c, 'reviewSubmissions', input.createdByEmail);
+    await persistRuntimeState();
+    return c.json(draft, 201);
+  } catch (error) {
+    console.error('[Speculative Addition Draft]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Speculative draft could not be saved.' }, 400);
+  }
+});
+
 function getReviewOperationsSummary() {
   const now = Date.now();
   const dayMs = 86_400_000;
@@ -685,6 +762,7 @@ function getRevenueOperationsSummary() {
       accounts: accountEntitlements.filter((account) => account.planId === plan.id).length,
     })),
     generatedExports: exportDeliverables.length,
+    speculativeAdditionDrafts: speculativeAdditionDrafts.length,
     monthlyRecurringRevenueCents: accountEntitlements.reduce((total, account) => {
       const plan = monetizationPlans.find((candidate) => candidate.id === account.planId);
       if (!plan?.unitAmountCents || account.status !== 'active') {
@@ -891,6 +969,18 @@ function assertUsageAllowed(c: Context, metric: UsageMetric, explicitEmail?: str
 
   if (limit !== null && limit !== undefined && entitlement.usage[metric] >= limit) {
     throw new Error(`${plan?.name ?? 'Current plan'} has reached its ${metric} limit.`);
+  }
+}
+
+function assertAdditionBuilderAllowed(c: Context, explicitEmail?: string): void {
+  const email = explicitEmail ?? c.req.header('x-account-email') ?? c.req.query('email');
+  const session = getAccountSession(email);
+  const allowed = session.scopes.some(
+    (scope) => scope === 'studio' || scope === 'enterprise' || scope === 'betaTester' || scope === 'admin',
+  );
+
+  if (!allowed) {
+    throw new Error('Studio, Enterprise, or Beta Tester scope is required to save speculative drafts.');
   }
 }
 

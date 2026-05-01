@@ -8,6 +8,7 @@ import type {
   PromotedSource,
   ReviewQueueItem,
   RuntimePersistenceMode,
+  SpeculativeAdditionDraft,
 } from '../../shared/types.js';
 import { seedReviewQueue } from '../../shared/seedData.js';
 import { createSourceFingerprint, normalizeSourceUrl } from '../deduplication/sourceDuplicates.js';
@@ -18,6 +19,7 @@ export type RuntimeState = {
   promotedSources: PromotedSource[];
   accountEntitlements: AccountEntitlement[];
   exportDeliverables: ExportDeliverable[];
+  speculativeAdditionDrafts: SpeculativeAdditionDraft[];
 };
 
 const runtimeStatePath = process.env.RUNTIME_STATE_PATH ?? join(process.cwd(), 'runtime-data', 'state.json');
@@ -437,6 +439,9 @@ function normalizeRuntimeState(rawState: Partial<RuntimeState>): RuntimeState {
     promotedSources: automatedSeedState.promotedSources,
     accountEntitlements: Array.isArray(rawState.accountEntitlements) ? rawState.accountEntitlements : [],
     exportDeliverables: Array.isArray(rawState.exportDeliverables) ? rawState.exportDeliverables : [],
+    speculativeAdditionDrafts: Array.isArray(rawState.speculativeAdditionDrafts)
+      ? rawState.speculativeAdditionDrafts
+      : [],
   };
 }
 

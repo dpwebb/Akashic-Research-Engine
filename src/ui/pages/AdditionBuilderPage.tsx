@@ -1,8 +1,8 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Clipboard, Download, ShieldCheck, Sparkles } from 'lucide-react';
+import { AlertTriangle, Clipboard, Download, Loader2, Save, ShieldCheck, Sparkles } from 'lucide-react';
 import { researchDataset } from '../../shared/researchData.js';
-import type { AdditionFramework, Source } from '../../shared/types.js';
+import type { AdditionFramework, Source, SpeculativeAdditionDraft } from '../../shared/types.js';
 import { useUserAccess } from '../userAccess.js';
 
 const guardrailItems = [
@@ -20,7 +20,7 @@ const uncertaintyOptions = [
 ] as const;
 
 export function AdditionBuilderPage() {
-  const { policy } = useUserAccess();
+  const { accountEmail, accountHeaders, policy } = useUserAccess();
   const [frameworkId, setFrameworkId] = useState(researchDataset.additionFrameworks[0]?.id ?? '');
   const [title, setTitle] = useState('Akashic Records as disciplined symbolic memory');
   const [proposal, setProposal] = useState('');
@@ -33,7 +33,10 @@ export function AdditionBuilderPage() {
   const [notJustified, setNotJustified] = useState('');
   const [checkedGuardrails, setCheckedGuardrails] = useState<Record<string, boolean>>({});
   const [brief, setBrief] = useState('');
+  const [drafts, setDrafts] = useState<SpeculativeAdditionDraft[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
 
   const framework = useMemo(
     () =>
@@ -44,6 +47,10 @@ export function AdditionBuilderPage() {
   const linkedSources = useMemo(
     () => researchDataset.sources.filter((source) => selectedSourceIds.includes(source.id)),
     [selectedSourceIds],
+  );
+  const selectedGuardrails = useMemo(
+    () => guardrailItems.filter((item) => checkedGuardrails[item]),
+    [checkedGuardrails],
   );
   const allGuardrailsChecked = guardrailItems.every((item) => checkedGuardrails[item]);
   const canGenerate =
@@ -56,23 +63,61 @@ export function AdditionBuilderPage() {
     allGuardrailsChecked;
   const downloadHref = brief ? `data:text/markdown;charset=utf-8,${encodeURIComponent(brief)}` : '';
 
+  useEffect(() => {
+    if (!policy.canUseAdditionBuilder || !accountEmail.trim()) {
+      setDrafts([]);
+      return;
+    }
+
+    let ignore = false;
+
+    async function loadDrafts() {
+      try {
+        const response = await fetch('/api/addition-builder/drafts', { headers: accountHeaders });
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as SpeculativeAdditionDraft[];
+        if (!ignore) {
+          setDrafts(data);
+        }
+      } catch {
+        if (!ignore) {
+          setDrafts([]);
+        }
+      }
+    }
+
+    void loadDrafts();
+
+    return () => {
+      ignore = true;
+    };
+  }, [accountEmail, accountHeaders, policy.canUseAdditionBuilder]);
+
+  function resetGeneratedOutput() {
+    setBrief('');
+    setSaveMessage('');
+  }
+
   function changeFramework(nextFrameworkId: string) {
     const nextFramework = researchDataset.additionFrameworks.find((candidate) => candidate.id === nextFrameworkId);
     setFrameworkId(nextFrameworkId);
     setSelectedSourceIds(nextFramework?.recommendedSourceIds.slice(0, 2) ?? []);
-    setBrief('');
+    resetGeneratedOutput();
   }
 
   function toggleSource(sourceId: string) {
     setSelectedSourceIds((current) =>
       current.includes(sourceId) ? current.filter((item) => item !== sourceId) : [...current, sourceId],
     );
-    setBrief('');
+    resetGeneratedOutput();
   }
 
   function toggleGuardrail(item: string) {
     setCheckedGuardrails((current) => ({ ...current, [item]: !current[item] }));
-    setBrief('');
+    resetGeneratedOutput();
   }
 
   function generateBrief(event: FormEvent<HTMLFormElement>) {
@@ -101,6 +146,7 @@ export function AdditionBuilderPage() {
         notJustified,
       }),
     );
+    setSaveMessage('');
   }
 
   async function copyBrief() {
@@ -109,6 +155,62 @@ export function AdditionBuilderPage() {
     }
 
     await navigator.clipboard.writeText(brief);
+    setSaveMessage('Brief copied.');
+  }
+
+  async function copyDraft(draft: SpeculativeAdditionDraft) {
+    await navigator.clipboard.writeText(draft.briefMarkdown);
+    setSaveMessage(`Copied ${draft.title}.`);
+  }
+
+  async function saveDraft() {
+    setError('');
+    setSaveMessage('');
+
+    if (!framework || !brief || !canGenerate) {
+      setError('Generate a complete brief before saving it for review.');
+      return;
+    }
+
+    if (!accountEmail.trim()) {
+      setError('Sign in with a Studio, Enterprise, or Beta Tester account email before saving drafts.');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/addition-builder/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
+        body: JSON.stringify({
+          title,
+          frameworkId: framework.id,
+          uncertainty,
+          proposal,
+          sourceIds: selectedSourceIds,
+          citationsNeeded,
+          counterarguments,
+          notJustified,
+          guardrails: selectedGuardrails,
+          briefMarkdown: brief,
+          createdByEmail: accountEmail.trim(),
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? 'Speculative draft could not be saved.');
+      }
+
+      const draft = data as SpeculativeAdditionDraft;
+      setDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 50));
+      setSaveMessage('Draft saved for review.');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Speculative draft could not be saved.');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   if (!policy.canUseAdditionBuilder) {
@@ -146,7 +248,14 @@ export function AdditionBuilderPage() {
         <form className="assistant-form builder-form" onSubmit={generateBrief}>
           <label>
             Brief title
-            <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} />
+            <input
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                resetGeneratedOutput();
+              }}
+              maxLength={160}
+            />
           </label>
 
           <label>
@@ -176,7 +285,10 @@ export function AdditionBuilderPage() {
             Proposed interpretation
             <textarea
               value={proposal}
-              onChange={(event) => setProposal(event.target.value)}
+              onChange={(event) => {
+                setProposal(event.target.value);
+                resetGeneratedOutput();
+              }}
               rows={6}
               maxLength={1800}
               placeholder="Draft the new interpretation in cautious language."
@@ -185,7 +297,13 @@ export function AdditionBuilderPage() {
 
           <label>
             Uncertainty level
-            <select value={uncertainty} onChange={(event) => setUncertainty(event.target.value as typeof uncertainty)}>
+            <select
+              value={uncertainty}
+              onChange={(event) => {
+                setUncertainty(event.target.value as typeof uncertainty);
+                resetGeneratedOutput();
+              }}
+            >
               {uncertaintyOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -217,7 +335,10 @@ export function AdditionBuilderPage() {
             Citations still needed
             <textarea
               value={citationsNeeded}
-              onChange={(event) => setCitationsNeeded(event.target.value)}
+              onChange={(event) => {
+                setCitationsNeeded(event.target.value);
+                resetGeneratedOutput();
+              }}
               rows={3}
               maxLength={900}
               placeholder="List missing page references, editions, quotations, or source checks."
@@ -228,7 +349,10 @@ export function AdditionBuilderPage() {
             Counterarguments
             <textarea
               value={counterarguments}
-              onChange={(event) => setCounterarguments(event.target.value)}
+              onChange={(event) => {
+                setCounterarguments(event.target.value);
+                resetGeneratedOutput();
+              }}
               rows={4}
               maxLength={1200}
               placeholder="Name weaker explanations, category errors, or reasons this may fail."
@@ -239,7 +363,10 @@ export function AdditionBuilderPage() {
             Not justified to claim
             <textarea
               value={notJustified}
-              onChange={(event) => setNotJustified(event.target.value)}
+              onChange={(event) => {
+                setNotJustified(event.target.value);
+                resetGeneratedOutput();
+              }}
               rows={4}
               maxLength={1200}
               placeholder="State claims the brief must not make."
@@ -294,15 +421,66 @@ export function AdditionBuilderPage() {
                 <Clipboard aria-hidden="true" />
                 Copy
               </button>
+              <button type="button" onClick={saveDraft} disabled={isSaving}>
+                {isSaving ? <Loader2 aria-hidden="true" /> : <Save aria-hidden="true" />}
+                {isSaving ? 'Saving...' : 'Save Draft'}
+              </button>
               <a href={downloadHref} download={`${slugify(title)}-speculative-brief.md`}>
                 <Download aria-hidden="true" />
                 Download
               </a>
             </div>
           </div>
+          {saveMessage && <p className="form-success">{saveMessage}</p>}
           <pre>{brief}</pre>
         </section>
       )}
+
+      <section className="saved-drafts-panel">
+        <div className="export-preview-header">
+          <div>
+            <h2>Saved Speculative Drafts</h2>
+            <p className="muted">Drafts remain outside the verified corpus until citation and category review is complete.</p>
+          </div>
+          <span className="tag">{drafts.length} saved</span>
+        </div>
+
+        {!accountEmail.trim() && (
+          <p className="form-error">Sign in with the beta tester or a paid Studio/Enterprise account to load saved drafts.</p>
+        )}
+
+        {accountEmail.trim() &&
+          (drafts.length === 0 ? (
+            <p className="muted">No speculative drafts have been saved for this workspace yet.</p>
+          ) : (
+            <div className="saved-draft-grid">
+              {drafts.map((draft) => (
+                <article className="index-card saved-draft-card" key={draft.id}>
+                  <Sparkles aria-hidden="true" />
+                  <h2>{draft.title}</h2>
+                  <p>{draft.frameworkName}</p>
+                  <p className="matched-terms">
+                    {draft.status} - grade {draft.evidenceGrade} - {draft.sourceIds.length} linked sources
+                  </p>
+                  <small>Saved {new Date(draft.createdAt).toLocaleString()}</small>
+                  <div className="review-actions">
+                    <button type="button" onClick={() => copyDraft(draft)}>
+                      <Clipboard aria-hidden="true" />
+                      Copy
+                    </button>
+                    <a
+                      href={`data:text/markdown;charset=utf-8,${encodeURIComponent(draft.briefMarkdown)}`}
+                      download={`${slugify(draft.title)}-saved-speculative-brief.md`}
+                    >
+                      <Download aria-hidden="true" />
+                      Download
+                    </a>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ))}
+      </section>
     </section>
   );
 }
