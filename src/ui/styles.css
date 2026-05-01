@@ -1290,6 +1290,111 @@ td span {
   max-width: 860px;
 }
 
+.paywall-panel {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  max-width: 760px;
+}
+
+.paywall-panel svg {
+  color: #8a4b24;
+}
+
+.paywall-panel h2,
+.paywall-panel p {
+  margin-bottom: 6px;
+}
+
+.paywall-panel a {
+  color: #0b5c44;
+  font-weight: 900;
+}
+
+.builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.builder-form {
+  max-width: none;
+}
+
+.builder-framework-summary {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  background: #fbfdf9;
+}
+
+.builder-framework-summary svg {
+  color: #8a4b24;
+}
+
+.builder-framework-summary h2,
+.builder-framework-summary p {
+  margin-bottom: 6px;
+}
+
+.builder-fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid #dbe2d8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfdf9;
+}
+
+.builder-fieldset legend {
+  padding: 0 6px;
+  color: #425046;
+  font-weight: 900;
+}
+
+.builder-source-list,
+.builder-checklist {
+  display: grid;
+  gap: 8px;
+}
+
+.builder-source-list {
+  max-height: 330px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.builder-source-list .check-row,
+.builder-checklist .check-row {
+  align-items: flex-start;
+  min-height: auto;
+  padding: 8px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.builder-source-list small {
+  display: block;
+  margin-top: 2px;
+  color: #5e6b62;
+  font-weight: 700;
+}
+
+.builder-side-panel {
+  gap: 12px;
+}
+
+.speculative-output {
+  max-width: 1120px;
+}
+
 @media (max-width: 840px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1317,11 +1422,12 @@ td span {
   .filter-panel,
   .claims-filter-panel,
   .genealogy-filter-panel,
-  .source-drilldown-panel,
-  .ops-grid,
-  .export-layout,
-  .export-form,
-  .distribution-row {
+    .source-drilldown-panel,
+    .ops-grid,
+    .export-layout,
+    .export-form,
+    .builder-layout,
+    .distribution-row {
     grid-template-columns: 1fr;
   }
 

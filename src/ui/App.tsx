@@ -46,7 +46,7 @@ const navItems = [
   { to: '/app/source-import', label: 'Import', icon: Import },
   { to: '/app/seed-queue', label: 'Seed Queue', icon: Inbox },
   { to: '/app/assistant', label: 'Assistant', icon: Bot },
-  { to: '/app/addition-builder', label: 'Builder', icon: Sparkles },
+  { to: '/app/addition-builder', label: 'Builder', icon: Sparkles, additionBuilderOnly: true },
   { to: '/app/exports', label: 'Exports', icon: Download },
   { to: '/app/billing', label: 'Memberships', icon: CreditCard },
 ];
@@ -83,7 +83,11 @@ export function App() {
 
 function WorkspaceShell() {
   const { tier, setTier, policy, account, accountEmail, isLoadingAccount } = useUserAccess();
-  const visibleItems = navItems.filter((item) => !item.adminOnly || policy.canAccessAdmin);
+  const visibleItems = navItems.filter(
+    (item) =>
+      (!item.adminOnly || policy.canAccessAdmin) &&
+      (!item.additionBuilderOnly || policy.canUseAdditionBuilder),
+  );
 
   return (
     <div className="app-shell">

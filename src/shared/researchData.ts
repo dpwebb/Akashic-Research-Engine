@@ -524,18 +524,48 @@ const additionFrameworks: AdditionFramework[] = [
     name: 'Symbolic universal memory',
     description: 'Treats the Akashic Records as a symbol for cultural memory and accumulated moral imagination.',
     requiredBoundaries: ['Mark as interpretive', 'Avoid empirical claims', 'Cite source traditions being compared'],
+    evidenceGrade: 'C',
+    recommendedSourceIds: ['sinnett-esoteric-buddhism', 'blavatsky-secret-doctrine', 'steiner-akashic-record'],
+    disallowedClaims: [
+      'Do not claim symbolic memory proves literal Akashic access.',
+      'Do not collapse distinct traditions into a single universal doctrine.',
+      'Do not cite later interpretations as evidence for earlier source intent.',
+    ],
+    outputTemplate:
+      'Frame the addition as a comparative interpretation. Identify the traditions being compared, cite the textual basis for each comparison, and state where the comparison stops.',
+    reviewPriority: 'medium',
   },
   {
     id: 'consciousness-archive',
     name: 'Consciousness archive metaphor',
     description: 'Frames record language as a metaphor for how minds organize memory, meaning, and identity.',
     requiredBoundaries: ['Mark as metaphor', 'Separate psychology from metaphysics', 'Avoid claims of literal access'],
+    evidenceGrade: 'E',
+    recommendedSourceIds: ['leadbeater-akashic-records', 'cayce-readings', 'jung-collective-unconscious'],
+    disallowedClaims: [
+      'Do not present psychological metaphor as clinical or neuroscientific fact.',
+      'Do not imply private readings are independently verified memories.',
+      'Do not convert experiential claims into historical evidence.',
+    ],
+    outputTemplate:
+      'Frame the addition as a metaphorical model. Separate source claims, psychological interpretation, and unresolved questions before suggesting any application.',
+    reviewPriority: 'high',
   },
   {
     id: 'information-persistence',
     name: 'Information persistence framework',
     description: 'Speculates about persistence of information as a mythic or philosophical lens, not a proven field.',
     requiredBoundaries: ['Mark as speculative', 'Do not cite physics as proof', 'Require explicit uncertainty language'],
+    evidenceGrade: 'E',
+    recommendedSourceIds: ['steiner-akashic-record', 'jung-collective-unconscious', 'britannica-akashic-record'],
+    disallowedClaims: [
+      'Do not cite physics, quantum theory, or information theory as proof of Akashic Records.',
+      'Do not state that a universal information field has been empirically established.',
+      'Do not recommend belief or practice from the speculation alone.',
+    ],
+    outputTemplate:
+      'Frame the addition as philosophical speculation. Use uncertainty language, list counterarguments, and state exactly what evidence would be needed to strengthen the claim.',
+    reviewPriority: 'high',
   },
 ];
 

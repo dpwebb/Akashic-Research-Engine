@@ -50,6 +50,11 @@ export type AdditionFramework = {
   name: string;
   description: string;
   requiredBoundaries: string[];
+  evidenceGrade: EvidenceGrade;
+  recommendedSourceIds: string[];
+  disallowedClaims: string[];
+  outputTemplate: string;
+  reviewPriority: 'low' | 'medium' | 'high';
 };
 
 export type DiscoverySearchRequest = {

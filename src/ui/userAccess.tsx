@@ -12,6 +12,7 @@ type TierPolicy = {
   canUseDiscovery: boolean;
   canUseSourceImport: boolean;
   canUseAssistant: boolean;
+  canUseAdditionBuilder: boolean;
   canUseExports: boolean;
 };
 
@@ -162,6 +163,7 @@ function buildPolicy(scopes: UserScope[], label: string): TierPolicy {
     canUseDiscovery: hasAny('free', 'paid', 'studio', 'enterprise', 'betaTester'),
     canUseSourceImport: hasAny('paid', 'studio', 'enterprise', 'betaTester'),
     canUseAssistant: hasAny('studio', 'enterprise', 'betaTester'),
+    canUseAdditionBuilder: hasAny('studio', 'enterprise', 'betaTester'),
     canUseExports: hasAny('paid', 'studio', 'enterprise', 'betaTester'),
   };
 }
