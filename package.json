@@ -9,6 +9,7 @@
     "check:production-services": "bash scripts/check-production-services.sh",
     "check:source-of-truth": "node scripts/check-github-source-of-truth.mjs",
     "dev": "vite",
+    "scrape:release-resources": "node scripts/scrape-release-resources.mjs",
     "start": "tsx server.ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit"
   },

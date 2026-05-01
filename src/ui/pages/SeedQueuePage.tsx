@@ -6,6 +6,7 @@ import type { ReviewQueueItem, SeedPack } from '../../shared/types.js';
 type StatusFilter = 'all' | ReviewQueueItem['status'];
 type ProvenanceFilter = 'all' | ReviewQueueItem['provenance'];
 type PriorityFilter = 'all' | ReviewQueueItem['reviewPriority'];
+type CitationFilter = 'all' | NonNullable<ReviewQueueItem['citationStatus']>;
 
 export function SeedQueuePage() {
   const [seedPacks, setSeedPacks] = useState<SeedPack[]>([]);
@@ -16,6 +17,7 @@ export function SeedQueuePage() {
   const [provenanceFilter, setProvenanceFilter] = useState<ProvenanceFilter>('all');
   const [sourceTypeFilter, setSourceTypeFilter] = useState<'all' | SourceClassification>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [citationFilter, setCitationFilter] = useState<CitationFilter>('all');
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -76,14 +78,22 @@ export function SeedQueuePage() {
   const pendingCount = queueItems.filter((item) => item.status === 'pending').length;
   const approvedCount = queueItems.filter((item) => item.status === 'approved').length;
   const promotedCount = queueItems.filter((item) => item.status === 'promoted').length;
+  const completeCitationCount = queueItems.filter((item) => item.citationStatus === 'complete').length;
   const filteredQueueItems = queueItems.filter((item) => {
     const searchableText = [
       item.title,
+      item.author,
+      item.publicationDate,
+      item.publisher,
       item.domain,
       item.summary,
       item.citationNotes,
+      item.stableCitation,
+      item.sourceCollection,
       item.reviewerNotes,
       item.reviewPriority,
+      item.citationStatus,
+      item.catalogTags?.join(' '),
       item.qualityFlags.join(' '),
       item.requiredActions.join(' '),
     ]
@@ -107,6 +117,10 @@ export function SeedQueuePage() {
     }
 
     if (priorityFilter !== 'all' && item.reviewPriority !== priorityFilter) {
+      return false;
+    }
+
+    if (citationFilter !== 'all' && item.citationStatus !== citationFilter) {
       return false;
     }
 
@@ -140,6 +154,10 @@ export function SeedQueuePage() {
           <span>Promoted</span>
           <strong>{promotedCount}</strong>
         </article>
+        <article>
+          <span>Complete citations</span>
+          <strong>{completeCitationCount}</strong>
+        </article>
       </div>
 
       <section className="panel">
@@ -149,7 +167,7 @@ export function SeedQueuePage() {
             <article className="seed-pack" key={pack.id}>
               <h3>{pack.name}</h3>
               <p>{pack.description}</p>
-              <p className="muted">{pack.sourceIds.length} canonical sources</p>
+              <p className="muted">{(pack.resourceCount ?? pack.sourceIds.length).toLocaleString()} resource leads</p>
               <ul>
                 {pack.querySeeds.map((seedQuery) => (
                   <li key={seedQuery}>{seedQuery}</li>
@@ -214,6 +232,15 @@ export function SeedQueuePage() {
             <option value="low">Low</option>
           </select>
         </label>
+        <label>
+          Citation
+          <select value={citationFilter} onChange={(event) => setCitationFilter(event.target.value as CitationFilter)}>
+            <option value="all">All citations</option>
+            <option value="complete">Complete</option>
+            <option value="partial">Partial</option>
+            <option value="needs review">Needs review</option>
+          </select>
+        </label>
       </section>
 
       <section className="source-list">
@@ -225,16 +252,23 @@ export function SeedQueuePage() {
                 <span className="tag">{item.proposedSourceType}</span>
                 <span className="tag">{item.provenance}</span>
                 <span className="tag">{item.reviewPriority} priority</span>
+                {item.citationStatus && <span className="tag">{item.citationStatus} citation</span>}
+                {item.accessType && <span className="tag">{item.accessType}</span>}
               </div>
               <h2>{item.title}</h2>
               <p className="muted">
-                {item.domain} - confidence {item.confidenceLevel} - discovered{' '}
+                {[item.author, item.publicationDate, item.publisher].filter(Boolean).join(' - ') || item.domain} - confidence {item.confidenceLevel} - discovered{' '}
                 {new Date(item.discoveredAt).toLocaleDateString()}
                 {item.reviewedAt ? ` - reviewed ${new Date(item.reviewedAt).toLocaleDateString()}` : ''}
               </p>
             </div>
             <p>{item.summary}</p>
+            {item.stableCitation && <p className="notes">Citation: {item.stableCitation}</p>}
             <p className="notes">{item.citationNotes}</p>
+            {item.sourceCollection && <p className="matched-terms">Collection: {item.sourceCollection}</p>}
+            {item.catalogTags && item.catalogTags.length > 0 && (
+              <p className="matched-terms">Catalog tags: {item.catalogTags.join(', ')}</p>
+            )}
             {item.canonicalUrl && <p className="matched-terms">Canonical URL: {item.canonicalUrl}</p>}
             {item.duplicateCandidates && item.duplicateCandidates.length > 0 && (
               <div className="review-detail-block">

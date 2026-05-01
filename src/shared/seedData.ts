@@ -1,4 +1,5 @@
 import type { ReviewQueueItem, SeedPack } from './types.js';
+import { releaseResourceCount, releaseResourceSeedQueries, releaseReviewQueue } from './releaseResourceCatalog.js';
 
 export const seedPacks: SeedPack[] = [
   {
@@ -45,9 +46,18 @@ export const seedPacks: SeedPack[] = [
       'jung-collective-unconscious',
     ],
   },
+  {
+    id: 'release-resource-catalogue',
+    name: 'Release resource catalogue',
+    description:
+      'Scraped public catalogue leads staged for the initial release review queue, with stable citation metadata and reviewer actions.',
+    querySeeds: releaseResourceSeedQueries.map((seedQuery) => seedQuery.query),
+    sourceIds: [],
+    resourceCount: releaseResourceCount,
+  },
 ];
 
-export const seedReviewQueue: ReviewQueueItem[] = [
+const curatedSeedReviewQueue: ReviewQueueItem[] = [
   {
     id: 'seed-theosophy-wiki-akashic',
     title: 'Akashic Records - Theosophy Wiki',
@@ -118,3 +128,5 @@ export const seedReviewQueue: ReviewQueueItem[] = [
     discoveredAt: '2026-04-30T00:00:00.000Z',
   },
 ];
+
+export const seedReviewQueue: ReviewQueueItem[] = [...curatedSeedReviewQueue, ...releaseReviewQueue];

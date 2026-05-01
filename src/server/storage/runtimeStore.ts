@@ -148,11 +148,16 @@ function normalizeReviewQueueItems(items: ReviewQueueItem[]): ReviewQueueItem[] 
       return {
         ...item,
         status: item.status === 'approved' && item.promotedAt ? 'promoted' : item.status,
+        qualityFlags: Array.isArray(item.qualityFlags) ? item.qualityFlags : [],
+        requiredActions: Array.isArray(item.requiredActions) ? item.requiredActions : [],
+        catalogTags: Array.isArray(item.catalogTags) ? item.catalogTags : undefined,
         canonicalUrl,
         sourceFingerprint:
           item.sourceFingerprint ??
           createSourceFingerprint({
             title: item.title,
+            author: item.author,
+            date: item.publicationDate,
             url: canonicalUrl,
             domain: item.domain,
           }),
@@ -161,6 +166,58 @@ function normalizeReviewQueueItems(items: ReviewQueueItem[]): ReviewQueueItem[] 
       return item;
     }
   });
+}
+
+function mergeReviewQueueWithSeedItems(items: ReviewQueueItem[]): ReviewQueueItem[] {
+  const normalizedItems = normalizeReviewQueueItems(items);
+  const normalizedSeedItems = normalizeReviewQueueItems(seedReviewQueue);
+  const seedByCanonicalUrl = new Map(normalizedSeedItems.map((item) => [getCanonicalReviewQueueUrl(item), item]));
+  const seen = new Set<string>();
+  const merged = normalizedItems.map((item) => {
+    const canonicalUrl = getCanonicalReviewQueueUrl(item);
+    seen.add(canonicalUrl);
+    const seedItem = seedByCanonicalUrl.get(canonicalUrl);
+
+    if (!seedItem) {
+      return item;
+    }
+
+    return {
+      ...seedItem,
+      ...item,
+      author: item.author ?? seedItem.author,
+      publicationDate: item.publicationDate ?? seedItem.publicationDate,
+      publisher: item.publisher ?? seedItem.publisher,
+      citationStatus: item.citationStatus ?? seedItem.citationStatus,
+      accessType: item.accessType ?? seedItem.accessType,
+      stableCitation: item.stableCitation ?? seedItem.stableCitation,
+      sourceCollection: item.sourceCollection ?? seedItem.sourceCollection,
+      catalogTags: item.catalogTags ?? seedItem.catalogTags,
+      qualityFlags: item.qualityFlags.length > 0 ? item.qualityFlags : seedItem.qualityFlags,
+      requiredActions: item.requiredActions.length > 0 ? item.requiredActions : seedItem.requiredActions,
+      reviewerNotes: item.reviewerNotes ?? seedItem.reviewerNotes,
+    };
+  });
+
+  for (const seedItem of normalizedSeedItems) {
+    const canonicalUrl = getCanonicalReviewQueueUrl(seedItem);
+    if (seen.has(canonicalUrl)) {
+      continue;
+    }
+
+    seen.add(canonicalUrl);
+    merged.push(seedItem);
+  }
+
+  return merged;
+}
+
+function getCanonicalReviewQueueUrl(item: ReviewQueueItem): string {
+  try {
+    return item.canonicalUrl ?? normalizeSourceUrl(item.url);
+  } catch {
+    return item.url;
+  }
 }
 
 function normalizeIngestionJobs(jobs: IngestionJob[]): IngestionJob[] {
@@ -192,7 +249,7 @@ async function writeAtomically(path: string, content: string): Promise<void> {
 
 function normalizeRuntimeState(rawState: Partial<RuntimeState>): RuntimeState {
   return {
-    reviewQueue: normalizeReviewQueueItems(Array.isArray(rawState.reviewQueue) ? rawState.reviewQueue : seedReviewQueue),
+    reviewQueue: mergeReviewQueueWithSeedItems(Array.isArray(rawState.reviewQueue) ? rawState.reviewQueue : []),
     ingestionJobs: normalizeIngestionJobs(Array.isArray(rawState.ingestionJobs) ? rawState.ingestionJobs : []),
     promotedSources: Array.isArray(rawState.promotedSources) ? rawState.promotedSources : [],
     accountEntitlements: Array.isArray(rawState.accountEntitlements) ? rawState.accountEntitlements : [],

@@ -21,6 +21,11 @@ type OperationsOverview = {
     duplicateConflicts: number;
     stalePending: number;
     needsPromotion: number;
+    citationComplete: number;
+    citationPartial: number;
+    citationNeedsReview: number;
+    releaseResourceMinimum: number;
+    releaseResourceCount: number;
     nextItems: ReviewQueueItem[];
   };
   ingestionJobs: {
@@ -112,6 +117,9 @@ export function OperationsPage() {
             <Health label="Approved" value={overview.reviewQueue.approved} />
             <Health label="Needs promotion" value={overview.reviewQueue.needsPromotion} />
             <Health label="Duplicate conflicts" value={overview.reviewQueue.duplicateConflicts} />
+            <Health label="Complete citations" value={overview.reviewQueue.citationComplete} />
+            <Health label="Citation review" value={overview.reviewQueue.citationNeedsReview} />
+            <Health label="Release floor" value={`${overview.reviewQueue.total}/${overview.reviewQueue.releaseResourceMinimum}`} />
           </div>
         </article>
 
@@ -166,7 +174,9 @@ export function OperationsPage() {
               {item.duplicateCandidates?.length ? <span className="tag"><GitMerge aria-hidden="true" /> duplicate</span> : null}
             </div>
             <h2>{item.title}</h2>
-            <p className="muted">{item.domain} - {item.requiredActions.join(' | ')}</p>
+            <p className="muted">
+              {item.stableCitation ?? item.domain} - {item.requiredActions.join(' | ')}
+            </p>
           </article>
         ))}
       </section>

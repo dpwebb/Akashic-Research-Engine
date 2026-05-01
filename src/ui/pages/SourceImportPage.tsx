@@ -63,11 +63,19 @@ export function SourceImportPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: preview.title,
+          author: preview.detectedAuthor || undefined,
+          publicationDate: preview.detectedDate || undefined,
+          publisher: preview.domain,
           url: preview.url,
           domain: preview.domain,
           proposedSourceType: preview.proposedSourceType,
           summary: preview.description,
           confidenceLevel: preview.confidenceLevel,
+          citationStatus: preview.citationStatus,
+          accessType: preview.fullTextCandidate ? 'full text' : 'catalog/reference',
+          stableCitation: buildPreviewCitation(preview),
+          sourceCollection: 'Manual import preview',
+          catalogTags: [preview.domain, preview.proposedSourceType, preview.citationStatus],
           reviewPriority:
             preview.citationStatus === 'needs review' || preview.proposedSourceType === 'commercial' || preview.proposedSourceType === 'low-quality'
               ? 'high'
@@ -327,4 +335,14 @@ function MetadataItem({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function buildPreviewCitation(preview: SourceImportPreview): string {
+  return [
+    preview.detectedAuthor || 'Unknown author',
+    preview.title,
+    preview.detectedDate || 'publication date pending',
+    preview.domain,
+    preview.url,
+  ].join('. ');
 }

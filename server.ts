@@ -26,6 +26,7 @@ import {
 } from './src/server/storage/runtimeStore.js';
 import { researchDataset } from './src/shared/researchData.js';
 import { seedPacks } from './src/shared/seedData.js';
+import { releaseResourceCount, releaseResourceMinimum } from './src/shared/releaseResourceCatalog.js';
 import { evidenceGrades, guardrailRules, sourceClassifications, type SourceClassification } from './src/shared/taxonomy.js';
 import { promptTemplates } from './src/shared/promptTemplates.js';
 import { monetizationPlans } from './src/shared/monetization.js';
@@ -92,11 +93,13 @@ app.get('/api/admin/config-drilldown', async (c) =>
       billingRateLimit: { windowMs: 60_000, maxRequests: 8 },
       reviewQueueEnabled: true,
       sourceImportEnabled: true,
+      releaseResourceMinimum,
     },
     dataset: {
       sources: researchDataset.sources.length,
       claims: researchDataset.claims.length,
       genealogyNodes: researchDataset.genealogy.nodes.length,
+      releaseResources: releaseResourceCount,
       reviewQueue: reviewQueue.length,
       ingestionJobs: ingestionJobs.length,
       promotedSources: promotedSources.length,
@@ -243,6 +246,10 @@ app.get('/api/runtime-summary', async (c) =>
       highPriority: reviewQueue.filter((item) => item.reviewPriority === 'high').length,
       mediumPriority: reviewQueue.filter((item) => item.reviewPriority === 'medium').length,
       lowPriority: reviewQueue.filter((item) => item.reviewPriority === 'low').length,
+      citationComplete: reviewQueue.filter((item) => item.citationStatus === 'complete').length,
+      citationPartial: reviewQueue.filter((item) => item.citationStatus === 'partial').length,
+      citationNeedsReview: reviewQueue.filter((item) => item.citationStatus === 'needs review' || !item.citationStatus).length,
+      releaseResourceMinimum,
     },
     ingestionJobs: {
       total: ingestionJobs.length,
@@ -258,13 +265,21 @@ app.get('/api/runtime-summary', async (c) =>
 
 const reviewQueueItemSchema = z.object({
   title: z.string().min(2).max(240),
+  author: z.string().max(180).optional(),
+  publicationDate: z.string().max(80).optional(),
+  publisher: z.string().max(180).optional(),
   url: z.string().url(),
   domain: z.string().min(2).max(160),
   proposedSourceType: z.enum(sourceClassifications),
   summary: z.string().min(1).max(1400),
   confidenceLevel: z.enum(['high', 'medium', 'low']).default('low'),
   reviewPriority: z.enum(['high', 'medium', 'low']).optional(),
+  citationStatus: z.enum(['complete', 'partial', 'needs review']).optional(),
+  accessType: z.enum(['full text', 'catalog/reference', 'movement page']).optional(),
+  stableCitation: z.string().max(1200).optional(),
   citationNotes: z.string().min(1).max(1200),
+  sourceCollection: z.string().max(180).optional(),
+  catalogTags: z.array(z.string().min(1).max(80)).max(16).optional(),
   qualityFlags: z.array(z.string().min(1).max(160)).max(12).optional(),
   requiredActions: z.array(z.string().min(1).max(220)).max(12).optional(),
   reviewerNotes: z.string().max(1200).optional(),
@@ -277,6 +292,8 @@ app.post('/api/review-queue', async (c) => {
     const canonicalUrl = normalizeSourceUrl(input.url);
     const sourceFingerprint = createSourceFingerprint({
       title: input.title,
+      author: input.author,
+      date: input.publicationDate,
       url: canonicalUrl,
       domain: input.domain,
     });
@@ -305,6 +322,15 @@ app.post('/api/review-queue', async (c) => {
       duplicateCandidates.length > 0 ? ['Resolve duplicate candidates before source promotion'] : [],
       12,
     );
+    const stableCitation =
+      input.stableCitation ??
+      buildStableCitation({
+        author: input.author,
+        title: input.title,
+        publicationDate: input.publicationDate,
+        publisher: input.publisher,
+        url: canonicalUrl,
+      });
 
     const item: ReviewQueueItem = {
       id: `discovery-${Date.now()}-${slugify(input.url)}`,
@@ -313,6 +339,10 @@ app.post('/api/review-queue', async (c) => {
       sourceFingerprint,
       domain: input.domain || getSourceDomain(input.url),
       reviewPriority: input.reviewPriority ?? inferReviewPriority(input.proposedSourceType, input.confidenceLevel),
+      citationStatus: input.citationStatus ?? inferReviewCitationStatus(input),
+      accessType: input.accessType ?? inferReviewAccessType(input.url, input.proposedSourceType),
+      stableCitation,
+      catalogTags: input.catalogTags ?? [],
       qualityFlags,
       requiredActions,
       provenance: 'discovery search',
@@ -381,15 +411,15 @@ app.post('/api/review-queue/:id/promote', async (c) => {
   const promotedSource: PromotedSource = {
     id: `promoted-${Date.now()}-${slugify(item.title)}`,
     title: item.title,
-    author: 'Pending review',
-    date: item.discoveredAt.slice(0, 10),
+    author: item.author ?? 'Pending review',
+    date: item.publicationDate ?? item.discoveredAt.slice(0, 10),
     url: item.url,
     canonicalUrl: item.canonicalUrl,
     sourceFingerprint: item.sourceFingerprint,
     sourceType: item.proposedSourceType,
     summary: item.summary,
     confidenceLevel: item.confidenceLevel,
-    citationNotes: item.citationNotes,
+    citationNotes: item.stableCitation ? `${item.stableCitation} ${item.citationNotes}` : item.citationNotes,
     reviewQueueItemId: item.id,
     promotedAt: new Date().toISOString(),
     promotionNotes: input.promotionNotes,
@@ -600,6 +630,11 @@ function getReviewOperationsSummary() {
     duplicateConflicts: reviewQueue.filter((item) => (item.duplicateCandidates?.length ?? 0) > 0).length,
     stalePending: stalePending.length,
     needsPromotion: [...reviewed, ...approved].filter((item) => !item.promotedSourceId).length,
+    citationComplete: reviewQueue.filter((item) => item.citationStatus === 'complete').length,
+    citationPartial: reviewQueue.filter((item) => item.citationStatus === 'partial').length,
+    citationNeedsReview: reviewQueue.filter((item) => item.citationStatus === 'needs review' || !item.citationStatus).length,
+    releaseResourceMinimum,
+    releaseResourceCount,
     nextItems: reviewQueue
       .filter((item) => item.status === 'pending' || item.status === 'reviewed' || item.status === 'approved')
       .slice(0, 8),
@@ -649,6 +684,9 @@ function getOperationsActionItems(): string[] {
 
   if (getRuntimePersistenceMode() === 'json') {
     actions.push('Configure DATABASE_URL to activate PostgreSQL runtime persistence.');
+  }
+  if (review.total < releaseResourceMinimum) {
+    actions.push(`Initial release requires at least ${releaseResourceMinimum} review resources; current queue has ${review.total}.`);
   }
   if (review.highPriority > 0) {
     actions.push(`${review.highPriority} high-priority review items need triage.`);
@@ -809,6 +847,8 @@ function renderExportMarkdown(type: ExportDeliverableType, title: string): strin
           `## ${item.title}`,
           `Status: ${item.status}`,
           `Priority: ${item.reviewPriority}`,
+          `Citation status: ${item.citationStatus ?? 'needs review'}`,
+          item.stableCitation ? `Stable citation: ${item.stableCitation}` : '',
           `URL: ${item.url}`,
           item.citationNotes,
         ].join('\n'),
@@ -879,6 +919,54 @@ function inferRequiredActions(sourceType: SourceClassification): string[] {
   }
 
   return ['Verify author, publisher, date, and stable URL', 'Record citation-ready page or section reference'];
+}
+
+function inferReviewCitationStatus(input: {
+  title: string;
+  author?: string;
+  publicationDate?: string;
+  publisher?: string;
+  stableCitation?: string;
+}): NonNullable<ReviewQueueItem['citationStatus']> {
+  if (input.stableCitation || (input.title && input.author && input.publicationDate && input.publisher)) {
+    return 'complete';
+  }
+
+  if (input.title && (input.author || input.publicationDate || input.publisher)) {
+    return 'partial';
+  }
+
+  return 'needs review';
+}
+
+function inferReviewAccessType(url: string, sourceType: SourceClassification): NonNullable<ReviewQueueItem['accessType']> {
+  if (url.includes('archive.org') || url.endsWith('.pdf') || url.includes('/Books/')) {
+    return 'full text';
+  }
+
+  if (sourceType === 'primary esoteric' || sourceType === 'modern spiritual') {
+    return 'movement page';
+  }
+
+  return 'catalog/reference';
+}
+
+function buildStableCitation(input: {
+  author?: string;
+  title: string;
+  publicationDate?: string;
+  publisher?: string;
+  url: string;
+}): string {
+  return [
+    input.author || 'Unknown author',
+    input.title,
+    input.publicationDate || 'publication date pending',
+    input.publisher || getSourceDomain(input.url),
+    input.url,
+  ]
+    .filter(Boolean)
+    .join('. ');
 }
 
 function getCanonicalQueueUrl(item: ReviewQueueItem): string {

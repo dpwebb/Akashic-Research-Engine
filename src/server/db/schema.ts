@@ -114,6 +114,9 @@ export type EntitySourceLinkTable = {
 export type ReviewQueueItemTable = {
   id: Generated<string>;
   title: string;
+  author: string;
+  publication_date: string;
+  publisher: string;
   url: string;
   canonical_url: string;
   source_fingerprint: string;
@@ -121,10 +124,15 @@ export type ReviewQueueItemTable = {
   proposed_source_type: string;
   summary: string;
   provenance: 'curated seed' | 'discovery search';
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'reviewed' | 'approved' | 'promoted' | 'rejected';
   confidence_level: 'high' | 'medium' | 'low';
   review_priority: 'high' | 'medium' | 'low';
+  citation_status: 'complete' | 'partial' | 'needs review';
+  access_type: 'full text' | 'catalog/reference' | 'movement page';
+  stable_citation: string;
   citation_notes: string;
+  source_collection: string;
+  catalog_tags: string[];
   quality_flags: string[];
   required_actions: string[];
   duplicate_candidates: unknown[];

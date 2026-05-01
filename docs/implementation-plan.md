@@ -20,6 +20,7 @@ Build the platform using the Hostinger VPS pattern already used by the other app
 6. Realistic Addition Builder for disciplined speculation.
 7. Ingestion jobs for source collection and later worker automation.
 8. Duplicate detection for source imports, review queue entries, ingestion jobs, and claim fingerprints.
+9. Initial-release source catalogue with at least 300 review resources, stable citations, source classifications, tags, and required review actions.
 
 ## Guardrails
 
@@ -38,3 +39,4 @@ Build the platform using the Hostinger VPS pattern already used by the other app
 5. Add OpenAI API calls behind guardrail validators.
 6. Add graph visualization for the genealogy map.
 7. Persist source aliases and duplicate review decisions in PostgreSQL.
+8. Move the generated release review catalogue from runtime-state JSON seeding into PostgreSQL migrations once the repository layer is active.

@@ -130,6 +130,11 @@ export function DiscoveryPage() {
           proposedSourceType: result.sourceType ?? 'speculative',
           summary: result.pageDescription || result.snippet || result.pageExcerpt || 'Discovery result pending review.',
           confidenceLevel: result.confidenceLevel ?? 'low',
+          citationStatus: 'needs review',
+          accessType: result.inspected ? 'full text' : 'catalog/reference',
+          stableCitation: `${result.pageTitle || result.title}. ${result.domain}. ${result.url}`,
+          sourceCollection: 'Discovery search',
+          catalogTags: [result.domain, result.category, result.sourceType ?? 'unclassified'],
           citationNotes: result.researchNotes.join(' '),
         }),
       });

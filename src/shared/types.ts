@@ -118,11 +118,19 @@ export type SeedPack = {
   description: string;
   querySeeds: string[];
   sourceIds: string[];
+  resourceCount?: number;
 };
+
+export type CitationStatus = 'complete' | 'partial' | 'needs review';
+
+export type SourceAccessType = 'full text' | 'catalog/reference' | 'movement page';
 
 export type ReviewQueueItem = {
   id: string;
   title: string;
+  author?: string;
+  publicationDate?: string;
+  publisher?: string;
   url: string;
   canonicalUrl?: string;
   sourceFingerprint?: string;
@@ -133,7 +141,12 @@ export type ReviewQueueItem = {
   status: 'pending' | 'reviewed' | 'approved' | 'promoted' | 'rejected';
   confidenceLevel: 'high' | 'medium' | 'low';
   reviewPriority: 'high' | 'medium' | 'low';
+  citationStatus?: CitationStatus;
+  accessType?: SourceAccessType;
+  stableCitation?: string;
   citationNotes: string;
+  sourceCollection?: string;
+  catalogTags?: string[];
   qualityFlags: string[];
   requiredActions: string[];
   discoveredAt: string;
@@ -251,8 +264,8 @@ export type BibliographicRecord = {
   archiveUrl: string;
   rightsStatus: 'public domain' | 'copyrighted' | 'unknown';
   sourceClassification: SourceClassification;
-  citationStatus: 'complete' | 'partial' | 'needs review';
-  accessType: 'full text' | 'catalog/reference' | 'movement page';
+  citationStatus: CitationStatus;
+  accessType: SourceAccessType;
   reviewStatus: 'reviewed' | 'needs page review' | 'lead only';
   stableCitation: string;
   pageReference: string;
@@ -277,7 +290,7 @@ export type SourceImportPreview = {
   wordCount: number;
   characterCount: number;
   fullTextCandidate: boolean;
-  citationStatus: 'complete' | 'partial' | 'needs review';
+  citationStatus: CitationStatus;
   qualityFlags: string[];
   textExcerpt: string;
   proposedSourceType: SourceClassification;
@@ -297,7 +310,7 @@ export type IngestionJob = {
   title: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
   sourceType: SourceClassification;
-  citationStatus: 'complete' | 'partial' | 'needs review';
+  citationStatus: CitationStatus;
   wordCount: number;
   fullTextCandidate: boolean;
   qualityFlags: string[];

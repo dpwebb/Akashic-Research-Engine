@@ -13,6 +13,10 @@ type RuntimeSummary = {
     highPriority: number;
     mediumPriority: number;
     lowPriority: number;
+    citationComplete: number;
+    citationPartial: number;
+    citationNeedsReview: number;
+    releaseResourceMinimum: number;
   };
   ingestionJobs: {
     total: number;
@@ -51,6 +55,10 @@ const emptyRuntimeSummary: RuntimeSummary = {
     highPriority: 0,
     mediumPriority: 0,
     lowPriority: 0,
+    citationComplete: 0,
+    citationPartial: 0,
+    citationNeedsReview: 0,
+    releaseResourceMinimum: 300,
   },
   ingestionJobs: {
     total: 0,
@@ -149,6 +157,16 @@ export function Dashboard() {
             label="Approved review items"
             value={runtimeSummary.reviewQueue.approved}
             total={Math.max(runtimeSummary.reviewQueue.total, 1)}
+          />
+          <HealthStat
+            label="Complete review citations"
+            value={runtimeSummary.reviewQueue.citationComplete}
+            total={Math.max(runtimeSummary.reviewQueue.total, 1)}
+          />
+          <HealthStat
+            label="Initial release resource floor"
+            value={runtimeSummary.reviewQueue.total}
+            total={runtimeSummary.reviewQueue.releaseResourceMinimum}
           />
           <HealthStat
             label="Failed ingestion jobs"

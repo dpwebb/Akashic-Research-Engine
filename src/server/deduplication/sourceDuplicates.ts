@@ -236,10 +236,14 @@ function reviewQueueToCandidate(item: ReviewQueueItem): CandidateRecord {
     url: item.url,
     canonicalUrl,
     domain: item.domain || getSourceDomain(item.url),
+    author: item.author,
+    date: item.publicationDate,
     sourceFingerprint:
       item.sourceFingerprint ??
       createSourceFingerprint({
         title: item.title,
+        author: item.author,
+        date: item.publicationDate,
         url: canonicalUrl,
         domain: item.domain,
       }),

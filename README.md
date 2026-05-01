@@ -19,6 +19,7 @@ This repository is configured for deployment on **Hostinger VPS** with the custo
 - React app entry at `src/main.tsx`.
 - Hono production server at `server.ts`.
 - Shared research taxonomy and seeded dataset in `src/shared/`.
+- Initial-release review catalogue in `src/shared/releaseResourceCatalog.ts`, generated from public Internet Archive metadata with stable citation fields.
 - Database schema draft in `docs/database-schema.sql`.
 - Shared provider/secret naming standard in `docs/hostinger-api-access-standard.md`.
 - `Dockerfile` and `docker-compose.yml` define the Hostinger Docker/Traefik service.
@@ -39,7 +40,12 @@ This repository is configured for deployment on **Hostinger VPS** with the custo
    ```bash
    pnpm run build
    ```
-4. Run the production server locally after building:
+4. Refresh the initial-release resource catalogue when needed:
+   ```bash
+   pnpm run scrape:release-resources
+   ```
+   The scraper fails if fewer than 300 reviewable resources are collected.
+5. Run the production server locally after building:
    ```bash
    pnpm start
    ```
