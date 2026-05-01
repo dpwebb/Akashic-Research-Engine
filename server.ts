@@ -7,6 +7,7 @@ import { getIntegrationStatus } from './src/server/integrations/status.js';
 import { BillingConfigurationError, createStripeCheckoutSession, getBillingPlanOverview } from './src/server/billing/stripeCheckout.js';
 import { generateResearchAssistantOutput } from './src/server/openai/researchAssistant.js';
 import { discoverRelatedSources } from './src/server/discovery/webDiscovery.js';
+import { getOnlineSignals } from './src/server/discovery/onlineSignals.js';
 import { previewSourceImport } from './src/server/importing/sourceImport.js';
 import {
   createSourceFingerprint,
@@ -132,6 +133,29 @@ app.get('/api/taxonomy', (c) =>
     guardrailRules,
   }),
 );
+
+
+app.get('/api/online/signals', async (c) => {
+  const topics = [
+    c.req.query('q1')?.trim(),
+    c.req.query('q2')?.trim(),
+    c.req.query('q3')?.trim(),
+  ].filter((value): value is string => Boolean(value));
+
+  const defaultTopics = ['Akashic records', 'Theosophy', 'Esotericism'];
+
+  try {
+    const signals = await getOnlineSignals(topics.length > 0 ? topics : defaultTopics, 2);
+    return c.json({
+      fetchedAt: new Date().toISOString(),
+      topics: topics.length > 0 ? topics : defaultTopics,
+      signals,
+    });
+  } catch (error) {
+    console.error('[Online Signals]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Could not fetch online signals.' }, 502);
+  }
+});
 
 app.get('/api/sources', (c) => c.json(researchDataset.sources));
 
