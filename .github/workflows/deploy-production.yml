@@ -64,9 +64,14 @@ jobs:
           PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
           PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$PRODUCTION_SSH_PRIVATE_KEY" > ~/.ssh/production_deploy_key.raw
+          set -euo pipefail
+
+          : "${PRODUCTION_SSH_PRIVATE_KEY:?PRODUCTION_SSH_PRIVATE_KEY secret is required}"
+          : "${PRODUCTION_HOST:?PRODUCTION_HOST secret is required}"
+          : "${PRODUCTION_SSH_PORT:?PRODUCTION_SSH_PORT secret is required}"
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PRODUCTION_SSH_PRIVATE_KEY" > "$HOME/.ssh/production_deploy_key.raw"
           python3 - <<'PY'
           import base64
           import binascii
@@ -100,9 +105,23 @@ jobs:
           key_path.write_text(key)
           raw_path.unlink()
           PY
-          chmod 600 ~/.ssh/production_deploy_key
-          ssh-keygen -y -f ~/.ssh/production_deploy_key >/dev/null
-          ssh-keyscan -p "$PRODUCTION_SSH_PORT" "$PRODUCTION_HOST" >> ~/.ssh/known_hosts
+          chmod 600 "$HOME/.ssh/production_deploy_key"
+          ssh-keygen -y -f "$HOME/.ssh/production_deploy_key" >/dev/null
+
+          for attempt in 1 2 3; do
+            if ssh-keyscan -T 20 -p "$PRODUCTION_SSH_PORT" "$PRODUCTION_HOST" >> "$HOME/.ssh/known_hosts"; then
+              break
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Unable to scan the configured production SSH host key on port $PRODUCTION_SSH_PORT. Verify PRODUCTION_HOST, PRODUCTION_SSH_PORT, firewall access, and that sshd is running."
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          sort -u "$HOME/.ssh/known_hosts" -o "$HOME/.ssh/known_hosts"
 
       - name: Deploy selected commit
         env:
