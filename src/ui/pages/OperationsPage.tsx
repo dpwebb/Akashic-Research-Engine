@@ -1,6 +1,6 @@
-import { AlertTriangle, CheckCircle2, Database, GitMerge, HardDrive, Inbox, RotateCw, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, Database, GitMerge, HardDrive, Inbox, RotateCw, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { IngestionJob, PromotedSource, ReviewQueueItem } from '../../shared/types.js';
+import type { IngestionJob, LaunchSchedulePhase, PromotedSource, ReviewQueueItem } from '../../shared/types.js';
 
 type OperationsOverview = {
   persistenceMode: 'postgres' | 'json';
@@ -45,10 +45,20 @@ type OperationsOverview = {
     total: number;
     latest: PromotedSource[];
   };
+  launchSchedule: {
+    updatedAt: string;
+    currentPhase?: LaunchSchedulePhase;
+    nextPhase?: LaunchSchedulePhase;
+    completed: number;
+    inProgress: number;
+    scheduled: number;
+    phases: LaunchSchedulePhase[];
+  };
   revenue: {
     accounts: number;
     activeAccounts: number;
     generatedExports: number;
+    speculativeAdditionDrafts: number;
     monthlyRecurringRevenueCents: number;
     planMix: Array<{ planId: string; name: string; accounts: number }>;
   };
@@ -102,6 +112,7 @@ export function OperationsPage() {
         <Metric icon={RotateCw} label="Queued jobs" value={overview.ingestionJobs.queued} />
         <Metric icon={AlertTriangle} label="Failed/stalled jobs" value={overview.ingestionJobs.failed + overview.ingestionJobs.stalled} />
         <Metric icon={TrendingUp} label="Active accounts" value={overview.revenue.activeAccounts} />
+        <Metric icon={CalendarDays} label="Launch phases done" value={`${overview.launchSchedule.completed}/${overview.launchSchedule.phases.length}`} />
       </div>
 
       <section className="panel">
@@ -109,6 +120,40 @@ export function OperationsPage() {
         <ul className="rule-list">
           {overview.actionItems.length === 0 ? <li>No urgent operational actions.</li> : overview.actionItems.map((item) => <li key={item}>{item}</li>)}
         </ul>
+      </section>
+
+      <section className="panel">
+        <div className="export-preview-header">
+          <div>
+            <h2>Launch Schedule</h2>
+            <p className="muted">
+              Updated {overview.launchSchedule.updatedAt}. Current focus:{' '}
+              {overview.launchSchedule.currentPhase?.phase ?? 'none assigned'}.
+            </p>
+          </div>
+          {overview.launchSchedule.nextPhase && (
+            <span className="tag">Next: {overview.launchSchedule.nextPhase.targetWindow}</span>
+          )}
+        </div>
+
+        <div className="launch-schedule-list">
+          {overview.launchSchedule.phases.map((phase) => (
+            <article className={`launch-phase-card ${phase.status}`} key={phase.id}>
+              <div>
+                <span className="tag">{phase.status}</span>
+                <small>{phase.targetWindow}</small>
+              </div>
+              <h3>{phase.phase}</h3>
+              <p>{phase.objective}</p>
+              <p className="matched-terms">Exit: {phase.exitCriteria}</p>
+              <ul>
+                {(phase.status === 'complete' ? phase.delivered : phase.nextActions).slice(0, 3).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="ops-grid">
@@ -141,6 +186,7 @@ export function OperationsPage() {
           <div className="health-grid">
             <Health label="Accounts" value={overview.revenue.accounts} />
             <Health label="Exports" value={overview.revenue.generatedExports} />
+            <Health label="Speculative drafts" value={overview.revenue.speculativeAdditionDrafts} />
             <Health label="MRR" value={`$${(overview.revenue.monthlyRecurringRevenueCents / 100).toLocaleString()}`} />
           </div>
           <div className="distribution-grid">

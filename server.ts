@@ -28,6 +28,12 @@ import {
 import { researchDataset } from './src/shared/researchData.js';
 import { seedPacks } from './src/shared/seedData.js';
 import { releaseResourceCount, releaseResourceMinimum } from './src/shared/releaseResourceCatalog.js';
+import {
+  getCurrentLaunchPhase,
+  getNextLaunchPhase,
+  launchSchedule,
+  launchScheduleUpdatedAt,
+} from './src/shared/launchSchedule.js';
 import { evidenceGrades, guardrailRules, sourceClassifications, type SourceClassification } from './src/shared/taxonomy.js';
 import { promptTemplates } from './src/shared/promptTemplates.js';
 import { monetizationPlans } from './src/shared/monetization.js';
@@ -131,6 +137,7 @@ app.get('/api/operations/command-center', async (c) =>
       total: promotedSources.length,
       latest: promotedSources.slice(0, 5),
     },
+    launchSchedule: getLaunchScheduleSummary(),
     revenue: getRevenueOperationsSummary(),
     actionItems: getOperationsActionItems(),
   }),
@@ -251,6 +258,15 @@ app.get('/api/research-index', (c) => c.json(researchDataset.index));
 app.get('/api/assistant/prompts', (c) => c.json(promptTemplates));
 
 app.get('/api/seed-packs', (c) => c.json(seedPacks));
+
+app.get('/api/launch-schedule', (c) =>
+  c.json({
+    updatedAt: launchScheduleUpdatedAt,
+    currentPhase: getCurrentLaunchPhase(),
+    nextPhase: getNextLaunchPhase(),
+    phases: launchSchedule,
+  }),
+);
 
 app.get('/api/review-queue', (c) => c.json(reviewQueue));
 app.get('/api/runtime-summary', async (c) =>
@@ -773,10 +789,23 @@ function getRevenueOperationsSummary() {
   };
 }
 
+function getLaunchScheduleSummary() {
+  return {
+    updatedAt: launchScheduleUpdatedAt,
+    currentPhase: getCurrentLaunchPhase(),
+    nextPhase: getNextLaunchPhase(),
+    completed: launchSchedule.filter((phase) => phase.status === 'complete').length,
+    inProgress: launchSchedule.filter((phase) => phase.status === 'in-progress').length,
+    scheduled: launchSchedule.filter((phase) => phase.status === 'scheduled').length,
+    phases: launchSchedule,
+  };
+}
+
 function getOperationsActionItems(): string[] {
   const actions: string[] = [];
   const review = getReviewOperationsSummary();
   const ingestion = getIngestionOperationsSummary();
+  const nextPhase = getNextLaunchPhase();
 
   if (getRuntimePersistenceMode() === 'json') {
     actions.push('Configure DATABASE_URL to activate PostgreSQL runtime persistence.');
@@ -801,6 +830,9 @@ function getOperationsActionItems(): string[] {
   }
   if (accountEntitlements.length === 0) {
     actions.push('Create at least one entitlement record to test paid workflow gating.');
+  }
+  if (nextPhase) {
+    actions.push(`Next launch milestone: ${nextPhase.phase} (${nextPhase.targetWindow}).`);
   }
 
   return actions;

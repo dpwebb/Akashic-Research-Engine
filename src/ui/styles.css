@@ -1240,6 +1240,63 @@ td span {
   font-weight: 800;
 }
 
+.launch-schedule-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.launch-phase-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  border: 1px solid #dbe2d8;
+  border-left: 5px solid #7a8a80;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfdf9;
+}
+
+.launch-phase-card.complete {
+  border-left-color: #2d7a52;
+}
+
+.launch-phase-card.in-progress {
+  border-left-color: #c79b3f;
+}
+
+.launch-phase-card.scheduled {
+  border-left-color: #6681a5;
+}
+
+.launch-phase-card.blocked {
+  border-left-color: #8b3434;
+}
+
+.launch-phase-card div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.launch-phase-card h3,
+.launch-phase-card p,
+.launch-phase-card ul {
+  margin-bottom: 0;
+}
+
+.launch-phase-card small {
+  color: #5e6b62;
+  font-weight: 800;
+}
+
+.launch-phase-card ul {
+  padding-left: 18px;
+  color: #425046;
+}
+
 .export-form {
   grid-template-columns: minmax(220px, 1fr) minmax(200px, 1fr) minmax(220px, 1fr) auto;
   align-items: end;

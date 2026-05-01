@@ -80,6 +80,19 @@ export type SpeculativeAdditionDraft = {
   updatedAt: string;
 };
 
+export type LaunchSchedulePhaseStatus = 'complete' | 'in-progress' | 'scheduled' | 'blocked';
+
+export type LaunchSchedulePhase = {
+  id: string;
+  phase: string;
+  status: LaunchSchedulePhaseStatus;
+  targetWindow: string;
+  objective: string;
+  delivered: string[];
+  nextActions: string[];
+  exitCriteria: string;
+};
+
 export type DiscoverySearchRequest = {
   query: string;
   scope: 'combined' | 'engine' | 'web';
