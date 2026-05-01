@@ -248,12 +248,18 @@ function automateSeedReviewApprovals(
     const automationAt = item.reviewedAt ?? item.promotedAt ?? item.discoveredAt ?? new Date().toISOString();
     const existingPromotedSource =
       promotedByReviewItem.get(item.id) ?? promotedByCanonicalUrl.get(getCanonicalReviewQueueUrl(item));
-    const promotedSource = existingPromotedSource ?? createPromotedSourceFromSeedItem(item, automationAt);
+    const automationNotes = buildSeedAutomationNotes(item, automationAt);
+    const promotedSource = existingPromotedSource ?? createPromotedSourceFromSeedItem(item, automationAt, automationNotes);
 
     if (!existingPromotedSource) {
       nextPromotedSources.unshift(promotedSource);
       promotedByReviewItem.set(item.id, promotedSource);
       promotedByCanonicalUrl.set(getCanonicalReviewQueueUrl(item), promotedSource);
+    } else {
+      existingPromotedSource.promotionNotes = appendAutomationNoteBlock(
+        existingPromotedSource.promotionNotes,
+        automationNotes.promotedSourceNoteBlock,
+      );
     }
 
     return {
@@ -263,9 +269,8 @@ function automateSeedReviewApprovals(
       promotedAt: item.promotedAt ?? promotedSource.promotedAt,
       promotedSourceId: item.promotedSourceId ?? promotedSource.id,
       assignedReviewer: item.assignedReviewer ?? 'Seed automation',
-      decisionReason:
-        item.decisionReason ??
-        'Automated seed pipeline reviewed, approved, and promoted this curated seed resource for initial dataset population.',
+      reviewerNotes: appendAutomationNoteBlock(item.reviewerNotes, automationNotes.reviewNoteBlock),
+      decisionReason: item.decisionReason ?? automationNotes.decisionReason,
     };
   });
 
@@ -275,7 +280,17 @@ function automateSeedReviewApprovals(
   };
 }
 
-function createPromotedSourceFromSeedItem(item: ReviewQueueItem, promotedAt: string): PromotedSource {
+type SeedAutomationNotes = {
+  decisionReason: string;
+  reviewNoteBlock: string;
+  promotedSourceNoteBlock: string;
+};
+
+function createPromotedSourceFromSeedItem(
+  item: ReviewQueueItem,
+  promotedAt: string,
+  automationNotes: SeedAutomationNotes,
+): PromotedSource {
   return {
     id: `seed-promoted-${slugify(item.id)}`,
     title: item.title,
@@ -298,8 +313,61 @@ function createPromotedSourceFromSeedItem(item: ReviewQueueItem, promotedAt: str
     citationNotes: item.stableCitation ? `${item.stableCitation} ${item.citationNotes}` : item.citationNotes,
     reviewQueueItemId: item.id,
     promotedAt,
-    promotionNotes: 'Auto-promoted from the curated seed catalogue during runtime seed normalization.',
+    promotionNotes: automationNotes.promotedSourceNoteBlock,
   };
+}
+
+function buildSeedAutomationNotes(item: ReviewQueueItem, automationAt: string): SeedAutomationNotes {
+  const citationMetadata = [
+    item.author ? `author ${item.author}` : 'author pending',
+    item.publicationDate ? `date ${item.publicationDate}` : 'date pending',
+    item.publisher ? `publisher ${item.publisher}` : 'publisher pending',
+    `citation status ${item.citationStatus ?? 'needs review'}`,
+    `access ${item.accessType ?? 'catalog/reference'}`,
+  ].join('; ');
+  const citationNote = item.stableCitation
+    ? `Citation note: stable citation recorded as "${item.stableCitation}" with ${citationMetadata}. Page-level references still need verification before claim extraction.`
+    : `Citation note: stable citation is incomplete; ${citationMetadata}. Reviewer should verify full bibliographic metadata before claim extraction.`;
+  const duplicateNote =
+    item.duplicateCandidates && item.duplicateCandidates.length > 0
+      ? `Duplicate note: ${item.duplicateCandidates
+          .slice(0, 4)
+          .map(
+            (candidate) =>
+              `${candidate.confidenceScore}% ${candidate.matchKind.replaceAll('_', ' ')} against ${candidate.title}; recommended ${candidate.recommendedAction}`,
+          )
+          .join(' | ')}.`
+      : 'Duplicate note: no duplicate candidates were attached to this curated seed resource during seed normalization.';
+  const promotionNote = `Promotion note: seed automation reviewed, approved, and promoted this curated seed resource at ${automationAt} for initial dataset population.`;
+  const decisionReason =
+    'Automated seed pipeline reviewed, approved, and promoted this curated seed resource for initial dataset population after recording citation, duplicate, and promotion notes.';
+  const reviewNoteBlock = ['Seed automation audit:', citationNote, duplicateNote, promotionNote].join('\n');
+  const promotedSourceNoteBlock = [promotionNote, citationNote, duplicateNote].join('\n');
+
+  return {
+    decisionReason,
+    reviewNoteBlock,
+    promotedSourceNoteBlock,
+  };
+}
+
+function appendAutomationNoteBlock(existingNotes: string | undefined, automationNoteBlock: string): string {
+  const trimmedExistingNotes = existingNotes?.trim();
+  if (!trimmedExistingNotes) {
+    return automationNoteBlock;
+  }
+
+  if (
+    trimmedExistingNotes.includes(automationNoteBlock) ||
+    (trimmedExistingNotes.includes('Seed automation audit:') &&
+      automationNoteBlock.startsWith('Seed automation audit:')) ||
+    (trimmedExistingNotes.includes('Promotion note: seed automation') &&
+      automationNoteBlock.startsWith('Promotion note: seed automation'))
+  ) {
+    return trimmedExistingNotes;
+  }
+
+  return `${trimmedExistingNotes}\n\n${automationNoteBlock}`;
 }
 
 function dedupePromotedSources(promotedSources: PromotedSource[]): PromotedSource[] {
