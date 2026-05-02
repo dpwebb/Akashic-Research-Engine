@@ -1,6 +1,7 @@
 import { Link, NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import {
   Archive,
+  BookOpenText,
   Bot,
   BriefcaseBusiness,
   CreditCard,
@@ -31,11 +32,13 @@ import { BillingPage } from './pages/BillingPage.js';
 import { OperationsPage } from './pages/OperationsPage.js';
 import { ExportsPage } from './pages/ExportsPage.js';
 import { AdminConfigPage } from './pages/AdminConfigPage.js';
+import { UserManualPage } from './pages/UserManualPage.js';
 import { AuthPage, PricingPage, PublicHomePage } from './pages/CommercialPages.js';
 import { UserAccessProvider, useUserAccess, type UserTier } from './userAccess.js';
 
 const navItems = [
   { to: '/app', label: 'Dashboard', icon: Home, end: true },
+  { to: '/app/manual', label: 'Manual', icon: BookOpenText },
   { to: '/app/operations', label: 'Operations', icon: BriefcaseBusiness },
   { to: '/app/admin/config', label: 'Admin Config', icon: Settings, adminOnly: true },
   { to: '/app/research-index', label: 'Index', icon: ScrollText },
@@ -61,6 +64,7 @@ export function App() {
         <Route path="/register" element={<AuthPage mode="register" />} />
         <Route path="/app" element={<WorkspaceShell />}>
           <Route index element={<Dashboard />} />
+          <Route path="manual" element={<UserManualPage />} />
           <Route path="operations" element={<OperationsPage />} />
           <Route path="admin/config" element={<AdminRoute />} />
           <Route path="research-index" element={<ResearchIndexPage />} />
