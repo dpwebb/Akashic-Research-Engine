@@ -37,6 +37,9 @@ select {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px;
   color: #f8fbf6;
   background: #173629;
